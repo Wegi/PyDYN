@@ -93,21 +93,22 @@ def generateMetadata(name):
     for req in todo:
         llist = parseURL(req.key)
         for linktup in llist:
-            tempdict = dict()
-            if linktup[1] in req and (req.key, linktup[1]) not in CACHE:
+            if linktup[1] in req and (req.key, linktup[1]) not in CACHE and \
+            (req.key, linktup[1]) not in reqdict:
                 print('---- Cache miss '+req.key+'-'+linktup[1])
                 ntemp = downloadPackage(linktup[0])
                 if ntemp:
                     tempdict = getDependencies(ntemp, req.key, linktup[1])
-                    if (req.key, linktup[1]) not in todo and (req.key, linktup[1]) not in reqdict:
+                    if req not in todo and (req.key, linktup[1]) not in reqdict:
                         todo.extend(tempdict[(req.key, linktup[1])])
                     os.unlink(ntemp) ## Cleanup
                 else:
                     tempdict = dict()
                 reqdict.update(tempdict)
-            elif (req.key, linktup[1]) in CACHE:
+            elif linktup[1] in req and (req.key, linktup[1]) in CACHE and \
+            (req.key, linktup[1]) not in reqdict:
                 print('++++ Cache hit '+req.key+'-'+linktup[1])
-                if (req.key, linktup[1]) not in todo and (req.key, linktup[1]) not in reqdict:
+                if req not in todo and (req.key, linktup[1]) not in reqdict:
                         todo.extend(CACHE[(req.key, linktup[1])])
                 reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
     CACHE.update(reqdict)       
@@ -121,7 +122,7 @@ if __name__ == '__main__':
         CACHE = pickle.load(open('pydyn.cache', 'rb'))
     except IOError:
         print('Could not load Cache')
-    generateMetadata('jac')
+    generateMetadata(sys.argv[1])
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('dumping cache')
