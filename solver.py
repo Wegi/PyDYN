@@ -10,6 +10,7 @@ import tempfile
 import os
 import tarfile
 import sys
+import pickle
 
 from pkg_resources import Distribution
 from pkg_resources import Requirement
@@ -29,7 +30,7 @@ def parseURL(name):
         else:
             linklist.append((REP_URL+name+'/'+link, version))
     return linklist
-    #TODO are zip packages legal?
+    #TODO zip packages
 
 def downloadPackage(link):
     print('---- Beginning Download of '+link)
@@ -69,8 +70,6 @@ def getDependencies(paths, name, version):
             reqlist.append(Requirement.parse(req))
         depdict = {(name.lower(), version): reqlist}
         f.close()
-    
-    os.unlink(paths) ## Cleanup, have to do this after metadata
     return depdict
 
 def newest(linklist):
@@ -87,24 +86,44 @@ def generateMetadata(name):
     if temp:
         reqdict = getDependencies(temp, name.lower(), newver[1])
         todo = reqdict[(name.lower(), newver[1])][:]
+        os.unlink(temp) ## Cleanup
     else:
         reqdict = dict()
         todo = []
     for req in todo:
         llist = parseURL(req.key)
         for linktup in llist:
-            if linktup[1] in req:
+            tempdict = dict()
+            if linktup[1] in req and (req.key, linktup[1]) not in CACHE:
+                print('---- Cache miss '+req.key+'-'+linktup[1])
                 ntemp = downloadPackage(linktup[0])
                 if ntemp:
                     tempdict = getDependencies(ntemp, req.key, linktup[1])
-                    todo.extend(tempdict[(req.key, linktup[1])])
+                    if (req.key, linktup[1]) not in todo and (req.key, linktup[1]) not in reqdict:
+                        todo.extend(tempdict[(req.key, linktup[1])])
+                    os.unlink(ntemp) ## Cleanup
                 else:
                     tempdict = dict()
-                reqdict.update(tempdict)       
+                reqdict.update(tempdict)
+            elif (req.key, linktup[1]) in CACHE:
+                print('++++ Cache hit '+req.key+'-'+linktup[1])
+                if (req.key, linktup[1]) not in todo and (req.key, linktup[1]) not in reqdict:
+                        todo.extend(CACHE[(req.key, linktup[1])])
+                reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+    CACHE.update(reqdict)       
     print(reqdict)
 
 
 if __name__ == '__main__':
     if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
         urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
-    generateMetadata('adhocracy')
+    try:
+        CACHE = pickle.load(open('pydyn.cache', 'rb'))
+    except IOError:
+        print('Could not load Cache')
+    generateMetadata('jac')
+    try:
+        pickle.dump(CACHE, open('pydyn.cache', 'wb'))
+        print('dumping cache')
+    except IOError:
+        print('Could not save Cache')
