@@ -15,6 +15,7 @@ import pickle
 from pkg_resources import Distribution
 from pkg_resources import Requirement
 from pkg_resources import parse_version
+from pkg_resources import working_set
 
 REP_URL = 'https://pypi.python.org/simple/'
 
@@ -113,6 +114,11 @@ def generateMetadata(name):
                 reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
     CACHE.update(reqdict)       
     print(reqdict)
+    return reqdict
+
+def generateOPB(requirementDict):
+    pass
+
 
 
 if __name__ == '__main__':
@@ -125,6 +131,6 @@ if __name__ == '__main__':
     generateMetadata(sys.argv[1])
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
-        print('dumping cache')
+        print('Dumping cache')
     except IOError:
         print('Could not save Cache')
