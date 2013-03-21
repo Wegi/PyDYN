@@ -18,6 +18,8 @@ from pkg_resources import parse_version
 from pkg_resources import working_set
 
 REP_URL = 'https://pypi.python.org/simple/'
+REMWEIGHT = '-100'
+NEWWEIGHT = '+20'
 
 def parseURL(name):
     resp = urllib.request.urlopen(REP_URL+name+'/')
@@ -114,12 +116,27 @@ def generateMetadata(name):
                 reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
     CACHE.update(reqdict)       
     print(reqdict)
-    return reqdict
+    return reqdict, newver[1]
 
-def generateOPB(requirementDict):
-    pass
-
-
+def generateOPB(name):
+    # Names have to be safe as opb variable
+    # Use sets for remmin, installmin, dep, conflict
+    minstring = 'min: '
+    reqdict, version = generateMetadata(name)
+    installedSet = set()
+    symtable = dict()
+    symcounter = 1
+    for p in working_set:
+        symtable.update({(p.key, p.version): 'x'+str(symcounter)})
+        symcounter += 1
+        minstring += REMWEIGHT+' '+symtable[(p.key, p.version)]+' '
+    for key, reqlist in reqdict.items():
+        if key not in symtable:
+            symtable.update({key: 'x'+str(symcounter)})
+            symcounter += 1
+        minstring += NEWWEIGHT+' '+symtable[key]+' '
+    minstring += ';'
+    print(minstring)
 
 if __name__ == '__main__':
     if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
@@ -128,7 +145,7 @@ if __name__ == '__main__':
         CACHE = pickle.load(open('pydyn.cache', 'rb'))
     except IOError:
         print('Could not load Cache')
-    generateMetadata(sys.argv[1])
+    generateOPB(sys.argv[1])
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('Dumping cache')
