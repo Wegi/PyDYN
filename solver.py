@@ -19,6 +19,13 @@ REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
 
 def parseURL(name):
+    """Provides a linklist for a module.
+
+    name has to be the name of a module hosted on PyPi. 
+    This function parses all links on PyPi for this module and returns
+    a list of tuples (link to module as .tar.gz, version).
+    """
+
     resp = urllib.request.urlopen(REP_URL+name+'/')
     data = resp.read()
     text = data.decode('utf-8')
@@ -33,6 +40,11 @@ def parseURL(name):
     #TODO zip packages
 
 def downloadPackage(link):
+    """Downloads a module.
+
+    Module gets saved as .tar.gz in /tmp and its path gets returned.
+    """
+
     print('---- Beginning Download of '+link)
     temp = tempfile.NamedTemporaryFile(delete=False)
     try:
@@ -42,12 +54,16 @@ def downloadPackage(link):
         print("Downloadlink probably dead")
         temp.name = None
     print('#### finished download')
-
     return temp.name
 
 def getDependencies(paths, name, version):
-    #Parse the files given in paths and extract their EGG-INFO
-    #return dictionary with (name, version) -> [Requirement]
+    """Parses Dependencies from setup.py of tarred module.
+
+    paths is the path to the module as .tar.gz. name and version 
+    are the name and version of the module, that has to be parsed.
+    Parses only if the install_requires String lists all the dependencies.
+    Returns a dictionary of the format {(name, version): [Requirement]}
+    """
 
     tarball = tarfile.open(paths, mode='r')
     depdict = dict()
@@ -73,6 +89,8 @@ def getDependencies(paths, name, version):
     return depdict
 
 def newest(linklist):
+    """Returns the newest module in a linklist."""
+
     newest_version = linklist[0]
     for link, version in linklist:
         if parse_version(version) > parse_version(newest_version[1]):
@@ -80,6 +98,11 @@ def newest(linklist):
     return newest_version
 
 def generateMetadata(name):
+    """Generates a complete Dictionary of all (recursive) Dependencies of name.
+
+    Returns a dictionary of the format {(name, version): [Requirement]}
+    """
+
     linklist = parseURL(name)
     newver = newest(linklist)
     temp = downloadPackage(newver[0])
@@ -111,12 +134,17 @@ def generateMetadata(name):
                 if req not in todo and (req.key, linktup[1]) not in reqdict:
                         todo.extend(CACHE[(req.key, linktup[1])])
                 reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
-    CACHE.update(reqdict)       
-    print(reqdict)
+    CACHE.update(reqdict)
     return reqdict, newver[1]
 
 def generateOPB(name):
-    # Names have to be safe as opb variable
+    """Generate a opb Representation of a requirement-dict.
+
+    The Requirement-dictionary gets parsed and a opb Instance of the
+    Installation-Problem gets created. The resulting opb String
+    should be parsable by all PBO-Solver, who comply to the
+    DIRACS Format.
+    """
     retstr = ''
     minstring = 'min: '
     reqdict, version = generateMetadata(name)
