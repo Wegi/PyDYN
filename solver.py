@@ -1,6 +1,3 @@
-##
-## TODO build in caching
-
 import urllib.request
 import urllib.error
 import patcher
@@ -120,10 +117,10 @@ def generateMetadata(name):
 
 def generateOPB(name):
     # Names have to be safe as opb variable
-    # Use sets for remmin, installmin, dep, conflict
+    retstr = ''
     minstring = 'min: '
     reqdict, version = generateMetadata(name)
-    installedSet = set()
+    conflicts = set()
     symtable = dict()
     symcounter = 1
     for p in working_set:
@@ -135,8 +132,35 @@ def generateOPB(name):
             symtable.update({key: 'x'+str(symcounter)})
             symcounter += 1
         minstring += NEWWEIGHT+' '+symtable[key]+' '
-    minstring += ';'
-    print(minstring)
+    minstring += ';\n'
+    retstr += minstring # minimization function
+    retstr += '+1 '+symtable[(name.lower(), version)]+' >= 1;\n' # module you want to install
+
+    for key, val in symtable.items():
+        for key2, val2 in symtable.items():
+            if key[0] == key2[0] and key[1] != key2[1]:
+                conflicts.add(frozenset([symtable[key], symtable[key2]]))
+    for fset in conflicts:
+        cset = set(fset)
+        retstr += '+1 '+cset.pop()+' +1 '+cset.pop()+' <= 1;\n' # conflicts
+
+    # update reqdict with working_set
+    for p in working_set:
+        reqdict.update({(p.key, p.version): p.requires()})
+    print(symtable)
+    for key, reqlist in reqdict.items():
+        for req in reqlist:
+            depstr = '-1 '+symtable[key]+' '
+            switch = False
+            for entry, sym in symtable.items():
+                if entry[0] == req.key and entry[1] in req:
+                    depstr += '+1 '+sym+' '
+                    switch = True
+            depstr += '>= 0;\n'
+            if switch: retstr += depstr # dependencies
+    return retstr
+
+
 
 if __name__ == '__main__':
     if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
@@ -145,7 +169,7 @@ if __name__ == '__main__':
         CACHE = pickle.load(open('pydyn.cache', 'rb'))
     except IOError:
         print('Could not load Cache')
-    generateOPB(sys.argv[1])
+    print(generateOPB(sys.argv[1]))
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('Dumping cache')
