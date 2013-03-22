@@ -169,7 +169,13 @@ if __name__ == '__main__':
         CACHE = pickle.load(open('pydyn.cache', 'rb'))
     except IOError:
         print('Could not load Cache')
-    print(generateOPB(sys.argv[1]))
+    try:
+        f = open('pydyn.opb', 'w')
+    except IOError:
+        print('ERROR: Could not generate opb-file')
+    else:
+        f.write(generateOPB(sys.argv[1]))
+        f.close()
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('Dumping cache')
