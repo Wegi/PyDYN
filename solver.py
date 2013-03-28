@@ -19,6 +19,10 @@ REP_URL = 'https://pypi.python.org/simple/'
 REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
 _VARDICT = dict()
+CACHE = dict()
+
+if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
+    urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
 
 def parseURL(name):
     """Provides a linklist for a module.
@@ -140,7 +144,7 @@ def generateMetadata(name):
     CACHE.update(reqdict)
     return reqdict, newver[1]
 
-def generateOPB(name):
+def generateOPB(name, working_set=working_set):
     """Generate a opb Representation of a requirement-dict.
 
     The Requirement-dictionary gets parsed and a opb Instance of the
@@ -224,6 +228,19 @@ def installRecommendation(install, uninstall, working_set=working_set):
                 break
         if is_in: print('~~ Uninstall: '+u[0]+' version '+u[1])
 
+def loadCache(path='pydyn.cache'):
+    try:
+        global CACHE 
+        CACHE = pickle.load(open(path, 'rb'))
+    except IOError:
+        print('Warning: Could not load Cache')
+
+def saveCache(path='pydyn.cache'):
+    try:
+        pickle.dump(CACHE, open(path, 'wb'))
+        print('Dumping cache')
+    except IOError:
+        print('Warning: Could not save Cache')
 
 ###Intern Methods, do not use from ouside modules
 def _callSolver(inputfile, solver='minisat+'):
@@ -234,18 +251,9 @@ def _callSolver(inputfile, solver='minisat+'):
     return subprocess.check_output([solver, inputfile]).decode('utf-8')
 
 if __name__ == '__main__':
-    if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
-        urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
-    try:
-        CACHE = pickle.load(open('pydyn.cache', 'rb'))
-    except IOError:
-        print('Warning: Could not load Cache')
+    loadCache()
     with open('pydyn.opb', 'w') as f:
         f.write(generateOPB(sys.argv[1]))
     inst, unin = parseSolverOutput(_callSolver('pydyn.opb', solver='minisat+'))
     installRecommendation(inst, unin)
-    try:
-        pickle.dump(CACHE, open('pydyn.cache', 'wb'))
-        print('Dumping cache')
-    except IOError:
-        print('Warning: Could not save Cache')
+    saveCache()
