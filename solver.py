@@ -43,6 +43,7 @@ def downloadPackage(link):
     """Downloads a module.
 
     Module gets saved as .tar.gz in /tmp and its path gets returned.
+    The file has to be unlinked manually. (use os.unlink())
     """
 
     print('---- Beginning Download of '+link)
@@ -70,7 +71,7 @@ def getDependencies(paths, name, version):
     try:
         setupfile = tarball.getmember(tarball.next().name+'/setup.py')
     except KeyError:
-        print('could not open .tar.gz-tempfile')
+        print('Error: No setup.py in tarball')
     else:
         f = tarball.extractfile(setupfile)
         content = f.read().decode('utf-8')
@@ -188,24 +189,17 @@ def generateOPB(name):
             if switch: retstr += depstr # dependencies
     return retstr
 
-
-
 if __name__ == '__main__':
     if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
         urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
     try:
         CACHE = pickle.load(open('pydyn.cache', 'rb'))
     except IOError:
-        print('Could not load Cache')
-    try:
-        f = open('pydyn.opb', 'w')
-    except IOError:
-        print('ERROR: Could not generate opb-file')
-    else:
+        print('Warning: Could not load Cache')
+    with open('pydyn.opb', 'w') as f:
         f.write(generateOPB(sys.argv[1]))
-        f.close()
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('Dumping cache')
     except IOError:
-        print('Could not save Cache')
+        print('Warning: Could not save Cache')
