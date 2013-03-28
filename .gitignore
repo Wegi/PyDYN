@@ -1,3 +1,5 @@
 __pycache__/
 pydyn.cache
 pydyn.opb
+output.png
+output.dot

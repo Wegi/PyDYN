@@ -17,7 +17,10 @@ def getGraph(paths=None):
     wset = pkg_resources.working_set
     if paths:
         wset = pkg_resources.WorkingSet(paths)
-    graph = dict([(p.project_name, [n.project_name for n in p.requires()]) for p in wset])
+    versions = dict()
+    for p in wset:
+        versions.update({p.key: p.version})
+    graph = dict([((p.key, p.version), [(n.key, versions[n.key]) for n in p.requires()]) for p in wset])
     return graph
 
 def graphToDot(graph, output="output.dot", show_disconnected=True):
@@ -28,19 +31,15 @@ def graphToDot(graph, output="output.dot", show_disconnected=True):
     if show_disconnected is True it shows Distributions without dependencies as well.
     """
 
-    try:
-        f = open(output, 'w')
-    except OSError:
-        print("Could not open/create output file")
-    else:
+    wset = pkg_resources.working_set
+    with open(output, 'w') as f:
         f.write('digraph DependencyGraph {\n')
         for dist, deplist in graph.items():
             if show_disconnected and not deplist:
-                f.write('"'+dist+'"\n')
+                f.write('"'+dist[0]+'-'+dist[1]+'"\n')
             for d in deplist:
-                f.write('"'+dist+'" -> "'+d+'"\n')
+                f.write('"'+dist[0]+'-'+dist[1]+'" -> "'+d[0]+'-'+d[1]+'"\n')
         f.write('}')
-        f.close()
 
 def graphToPNG(graph, output="output.png", show_disconnected=True):
     """Output a graph as PNG.

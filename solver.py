@@ -20,6 +20,7 @@ REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
 _VARDICT = dict()
 CACHE = dict()
+_REQ = dict()
 
 if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
     urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
@@ -152,6 +153,7 @@ def generateOPB(name, working_set=working_set):
     should be parsable by all PBO-Solver, who comply to the
     DIRACS Format.
     """
+
     retstr = ''
     minstring = 'min: '
     reqdict, version = generateMetadata(name)
@@ -182,6 +184,8 @@ def generateOPB(name, working_set=working_set):
     # update reqdict with working_set
     for p in working_set:
         reqdict.update({(p.key, p.version): p.requires()})
+    global _REQ
+    _REQ = reqdict
     for key, reqlist in reqdict.items():
         for req in reqlist:
             depstr = '-1 '+symtable[key]+' '
@@ -203,6 +207,7 @@ def parseSolverOutput(output):
     The output of this method are two lists which indicate
     which modules are to be installed and which are not.
     """
+
     exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
     variables = exp.group(0).split()
     install = [_VARDICT[var] for var in variables if var.startswith('x')]
@@ -213,6 +218,7 @@ def installRecommendation(install, uninstall, working_set=working_set):
     """Human Readable advice on which modules have to be installed on
     current Working Set.
     """
+
     for i in install:
         is_in = False
         for p in working_set:
@@ -242,12 +248,20 @@ def saveCache(path='pydyn.cache'):
     except IOError:
         print('Warning: Could not save Cache')
 
+def getFutureState(inst):
+    """Give back a graph for drawing methods.
+
+    Don't clear the global _REQ after the corresponding opb generation.
+    """
+    pass ###TODO
+
 ###Intern Methods, do not use from ouside modules
 def _callSolver(inputfile, solver='minisat+'):
     """Call a solver with an opb instance.
 
     Returns output in DIMACS format.
     """
+
     return subprocess.check_output([solver, inputfile]).decode('utf-8')
 
 if __name__ == '__main__':

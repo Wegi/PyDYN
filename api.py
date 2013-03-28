@@ -62,3 +62,8 @@ def getInstallStrings(install, uninstall):
     Get a Human Readable String which gives Install / uninstall advice.
     """
     solver.installRecommendation(install, uninstall)
+
+def drawPNG(name):
+    """Output a .png file with the dependency graph after name would be installed."""
+    graph = depgraph.getGraph()
+    
