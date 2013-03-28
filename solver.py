@@ -8,6 +8,7 @@ import os
 import tarfile
 import sys
 import pickle
+import subprocess
 
 from pkg_resources import Distribution
 from pkg_resources import Requirement
@@ -189,6 +190,15 @@ def generateOPB(name):
             if switch: retstr += depstr # dependencies
     return retstr
 
+###Intern Methods, do not use from ouside modules
+def _callSolver(inputfile, solver='minisat+'):
+    """Call a solver with an opb instance.
+
+    Returns output in DIMACS format.
+    """
+    return subprocess.check_output([solver, inputfile]).decode('utf-8')
+
+
 if __name__ == '__main__':
     if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
         urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
@@ -198,6 +208,7 @@ if __name__ == '__main__':
         print('Warning: Could not load Cache')
     with open('pydyn.opb', 'w') as f:
         f.write(generateOPB(sys.argv[1]))
+    print(_callSolver('pydyn.opb', solver='minisat+'))
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('Dumping cache')
