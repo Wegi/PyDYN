@@ -18,6 +18,7 @@ from pkg_resources import working_set
 REP_URL = 'https://pypi.python.org/simple/'
 REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
+_VARDICT = dict()
 
 def parseURL(name):
     """Provides a linklist for a module.
@@ -177,7 +178,6 @@ def generateOPB(name):
     # update reqdict with working_set
     for p in working_set:
         reqdict.update({(p.key, p.version): p.requires()})
-    print(symtable)
     for key, reqlist in reqdict.items():
         for req in reqlist:
             depstr = '-1 '+symtable[key]+' '
@@ -188,7 +188,42 @@ def generateOPB(name):
                     switch = True
             depstr += '>= 0;\n'
             if switch: retstr += depstr # dependencies
+    for key, val in symtable.items():
+        _VARDICT.update({val: key})
     return retstr
+
+def parseSolverOutput(output):
+    """Parse the output of a opb.Solver.
+
+    The output of the solve has to be in DIMACS format.
+    The output of this method are two lists which indicate
+    which modules are to be installed and which are not.
+    """
+    exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
+    variables = exp.group(0).split()
+    install = [_VARDICT[var] for var in variables if var.startswith('x')]
+    uninstall = [_VARDICT[var[1:]] for var in variables if var.startswith('-')]
+    return install, uninstall
+
+def installRecommendation(install, uninstall, working_set=working_set):
+    """Human Readable advice on which modules have to be installed on
+    current Working Set.
+    """
+    for i in install:
+        is_in = False
+        for p in working_set:
+            if i[0] == p.key and i[1] == p.version:
+                is_in = True
+                break
+        if not is_in: print('~~ Install: '+i[0]+' version '+i[1])
+    for u in uninstall:
+        is_in = False
+        for p in working_set:
+            if u[0] == p.key and u[1] == p.version:
+                is_in = True
+                break
+        if is_in: print('~~ Uninstall: '+u[0]+' version '+u[1])
+
 
 ###Intern Methods, do not use from ouside modules
 def _callSolver(inputfile, solver='minisat+'):
@@ -197,7 +232,6 @@ def _callSolver(inputfile, solver='minisat+'):
     Returns output in DIMACS format.
     """
     return subprocess.check_output([solver, inputfile]).decode('utf-8')
-
 
 if __name__ == '__main__':
     if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
@@ -208,7 +242,8 @@ if __name__ == '__main__':
         print('Warning: Could not load Cache')
     with open('pydyn.opb', 'w') as f:
         f.write(generateOPB(sys.argv[1]))
-    print(_callSolver('pydyn.opb', solver='minisat+'))
+    inst, unin = parseSolverOutput(_callSolver('pydyn.opb', solver='minisat+'))
+    installRecommendation(inst, unin)
     try:
         pickle.dump(CACHE, open('pydyn.cache', 'wb'))
         print('Dumping cache')
