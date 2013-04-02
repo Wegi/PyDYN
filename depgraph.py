@@ -56,7 +56,24 @@ def graphToPNG(graph, output="output.png", show_disconnected=True):
     try:
         check_call(['dot', '-Tpng', dotout, '-o', output])
     except CalledProcessError:
-        print('An error ocurred during conversion to PNG. Make sure you have graphviz installed')
+        print('Error: An error ocurred during conversion to PNG. Make sure you have graphviz installed')
+
+def graphToSVG(graph, output="output.svg", show_disconnected=True):
+    """Output a graph as PNG.
+
+    Only works on UNIX-Systems with the graphviz-tool installed.
+    This method will create/overwrite a .dot file too.
+    The format of graph has to be like the one getGraph() returns.
+    output is the output-file.
+    if show_disconnected is True it shows Distributions without dependencies as well.
+    """
+    
+    dotout = os.path.splitext(output)[0]+'.dot'
+    graphToDot(graph, dotout, show_disconnected)
+    try:
+        check_call(['dot', '-Tsvg', dotout, '-o', output])
+    except CalledProcessError:
+        print('Error: An error ocurred during conversion to PNG. Make sure you have graphviz installed')    
 
 def graphToTerminal(graph, show_disconnected=True):
     """Output a graph as a Text Representation on the Terminal.

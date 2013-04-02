@@ -83,6 +83,16 @@ def getInstallStrings():
 def drawPNG():
     """Output a .png file with the dependency graph after parsed module would be installed.
 
-    A module should have been parsed with installFor() before calling this function"""
+    A module should have been parsed with installFor() before calling this function
+    """
     graph = solver.getFutureState(_installList)
     depgraph.graphToPNG(graph)
+
+def drawSVG():
+    """Output a .svg file with the dependency graph after parsed module would be installed.
+
+    A module should have been parsed with installFor() before calling this function
+    graphviz package has to be installed on UNIX Systems.
+    """
+    graph = solver.getFutureState(_installList)
+    depgraph.graphToSVG(graph)    
