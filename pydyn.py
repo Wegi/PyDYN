@@ -65,5 +65,6 @@ def getInstallStrings(install, uninstall):
 
 def drawPNG(name):
     """Output a .png file with the dependency graph after name would be installed."""
-    graph = depgraph.getGraph()
-    
+    i, u = getInstallLists(name)
+    graph = solver.getFutureState(i)
+    depgraph.graphToPNG(graph)

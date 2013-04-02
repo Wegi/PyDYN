@@ -253,7 +253,16 @@ def getFutureState(inst):
 
     Don't clear the global _REQ after the corresponding opb generation.
     """
-    pass ###TODO
+    graph = dict()
+    for i in inst:
+        reqs = []
+        for x in _REQ[i]:
+            for j in inst:
+                if x.key == j[0]:
+                    reqs.append(j)
+                    break
+        graph.update({i: reqs})
+    return graph
 
 ###Intern Methods, do not use from ouside modules
 def _callSolver(inputfile, solver='minisat+'):

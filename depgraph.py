@@ -30,7 +30,7 @@ def graphToDot(graph, output="output.dot", show_disconnected=True):
     output is the output-file.
     if show_disconnected is True it shows Distributions without dependencies as well.
     """
-
+    ##TODO Optimize layout
     wset = pkg_resources.working_set
     with open(output, 'w') as f:
         f.write('digraph DependencyGraph {\n')
