@@ -17,6 +17,7 @@ _solver = 'minisat+'
 _working_set = None
 _installList = []
 _uninstallList = []
+_solvable = True
 
 def installFor(name):
     """Set the parameter for the module which you want to install.
@@ -30,7 +31,8 @@ def installFor(name):
     solver.saveCache()
     global _installList
     global _uninstallList
-    _installList, _uninstallList = solver.parseSolverOutput(solver._callSolver('pydyn.opb', solver=_solver))
+    global _solvable
+    _installList, _uninstallList, _solvable = solver.parseSolverOutput(solver._callSolver('pydyn.opb', solver=_solver))
 
 def loadCache(path):
     """Load another cache file."""
@@ -95,4 +97,9 @@ def drawSVG():
     graphviz package has to be installed on UNIX Systems.
     """
     graph = solver.getFutureState(_installList)
-    depgraph.graphToSVG(graph)    
+    depgraph.graphToSVG(graph)
+
+def isSolvable():
+    """Returns wether the current instance is satisfiable or not. (Run InstallFor() beforehand)"""
+
+    return _solvable 

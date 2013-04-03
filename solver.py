@@ -209,10 +209,17 @@ def parseSolverOutput(output):
     """
 
     exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
+    solvablestr = re.search(r'^s.*', output, flags=re.MULTILINE)
+    temp = solvablestr.split()
+    solvable = False
+    if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
+        solvable = True
+    elif temp[1] == 'UNSATISFIABLE':
+        solvable = False
     variables = exp.group(0).split()
     install = [_VARDICT[var] for var in variables if var.startswith('x')]
     uninstall = [_VARDICT[var[1:]] for var in variables if var.startswith('-')]
-    return install, uninstall
+    return install, uninstall, solvable 
 
 def installRecommendation(install, uninstall, working_set=working_set):
     """Human Readable advice on which modules have to be installed on
