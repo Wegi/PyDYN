@@ -18,6 +18,7 @@ from pkg_resources import working_set
 REP_URL = 'https://pypi.python.org/simple/'
 REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
+FAKEWEIGHT = '+9001'  ##fake metamodule
 _VARDICT = dict()
 CACHE = dict()
 _REQ = dict()
@@ -36,7 +37,7 @@ def parseURL(name):
     resp = urllib.request.urlopen(REP_URL+name+'/')
     data = resp.read()
     text = data.decode('utf-8')
-    linkiter = re.findall(r"<a href=\"([\.\.|https?].*-{1}(.*?)\.tar\.gz.*?)\"", text)
+    linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text) ##TODO Hotfix
     linklist = []
     for link, version in linkiter:
         if link.startswith('http'):
@@ -73,28 +74,32 @@ def getDependencies(paths, name, version):
     Returns a dictionary of the format {(name, version): [Requirement]}
     """
 
-    tarball = tarfile.open(paths, mode='r')
-    depdict = dict()
     try:
-        setupfile = tarball.getmember(tarball.next().name+'/setup.py')
-    except KeyError:
-        print('Error: No setup.py in tarball')
+        tarball = tarfile.open(paths, mode='r')
+    except tarfile.ReadError:
+        print('Error: Not a tarfile, ignore it')
     else:
-        f = tarball.extractfile(setupfile)
-        content = f.read().decode('utf-8')
-        rawstring = re.findall(r'install_requires=\[(.*?)\]', content, flags=re.DOTALL)
-
-        if rawstring:
-            deplist = re.findall(r'"(.*?)"', rawstring[0])
-            deplist.extend(re.findall(r"'(.*?)'", rawstring[0]))
+        depdict = dict()
+        try:
+            setupfile = tarball.getmember(tarball.next().name+'/setup.py')
+        except KeyError:
+            print('Error: No setup.py in tarball')
         else:
-            deplist = []
-        reqlist = []
-        for req in deplist:
-            reqlist.append(Requirement.parse(req))
-        depdict = {(name.lower(), version): reqlist}
-        f.close()
-    return depdict
+            f = tarball.extractfile(setupfile)
+            content = f.read().decode('utf-8')
+            rawstring = re.findall(r'install_requires=\[(.*?)\]', content, flags=re.DOTALL)
+
+            if rawstring:
+                deplist = re.findall(r'"(.*?)"', rawstring[0])
+                deplist.extend(re.findall(r"'(.*?)'", rawstring[0]))
+            else:
+                deplist = []
+            reqlist = []
+            for req in deplist:
+                reqlist.append(Requirement.parse(req))
+            depdict = {(name.lower(), version): reqlist}
+            f.close()
+        return depdict
 
 def newest(linklist):
     """Returns the newest module in a linklist."""
@@ -116,6 +121,7 @@ def generateMetadata(name):
     temp = downloadPackage(newver[0])
     if temp:
         reqdict = getDependencies(temp, name.lower(), newver[1])
+        if not reqdict: reqdict = dict()
         todo = reqdict[(name.lower(), newver[1])][:]
         os.unlink(temp) ## Cleanup
     else:
@@ -124,20 +130,19 @@ def generateMetadata(name):
     for req in todo:
         llist = parseURL(req.key)
         for linktup in llist:
-            if linktup[1] in req and (req.key, linktup[1]) not in CACHE and \
-            (req.key, linktup[1]) not in reqdict:
+            if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in reqdict:
                 print('---- Cache miss '+req.key+'-'+linktup[1])
                 ntemp = downloadPackage(linktup[0])
                 if ntemp:
                     tempdict = getDependencies(ntemp, req.key, linktup[1])
+                    if not tempdict: tempdict = dict()
                     if req not in todo and (req.key, linktup[1]) not in reqdict:
                         todo.extend(tempdict[(req.key, linktup[1])])
                     os.unlink(ntemp) ## Cleanup
                 else:
                     tempdict = dict()
                 reqdict.update(tempdict)
-            elif linktup[1] in req and (req.key, linktup[1]) in CACHE and \
-            (req.key, linktup[1]) not in reqdict:
+            elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in reqdict:
                 print('++++ Cache hit '+req.key+'-'+linktup[1])
                 if req not in todo and (req.key, linktup[1]) not in reqdict:
                         todo.extend(CACHE[(req.key, linktup[1])])
@@ -145,33 +150,46 @@ def generateMetadata(name):
     CACHE.update(reqdict)
     return reqdict, newver[1]
 
-def generateOPB(name, working_set=working_set):
+def generateOPB(reqdict, name, version, working_set=working_set, forCheck=False, checkOpts=('', '')):
     """Generate a opb Representation of a requirement-dict.
 
     The Requirement-dictionary gets parsed and a opb Instance of the
     Installation-Problem gets created. The resulting opb String
     should be parsable by all PBO-Solver, who comply to the
     DIRACS Format.
+
+    forCheck has to be True only if yo use this method from checkFutureDependency() in the api.
     """
 
     retstr = ''
     minstring = 'min: '
-    reqdict, version = generateMetadata(name)
+    fakenames = set() ##dictionary for fakepackages
     conflicts = set()
     symtable = dict()
     symcounter = 1
-    for p in working_set:
-        symtable.update({(p.key, p.version): 'x'+str(symcounter)})
-        symcounter += 1
-        minstring += REMWEIGHT+' '+symtable[(p.key, p.version)]+' '
+    if not forCheck:
+        for p in working_set:
+            symtable.update({(p.key, p.version): 'x'+str(symcounter)})
+            symcounter += 1
+            minstring += REMWEIGHT+' '+symtable[(p.key, p.version)]+' '
     for key, reqlist in reqdict.items():
         if key not in symtable:
             symtable.update({key: 'x'+str(symcounter)})
             symcounter += 1
         minstring += NEWWEIGHT+' '+symtable[key]+' '
+        if forCheck:
+            for req in reqlist:
+                fakenames.add(req.key)
+    if forCheck:
+        for item in fakenames:
+            symtable.update({(item.lower(), '0.0-fake'): 'x'+str(symcounter)})
+            minstring += FAKEWEIGHT+' x'+str(symcounter)+' '
+            symcounter += 1
     minstring += ';\n'
     retstr += minstring # minimization function
     retstr += '+1 '+symtable[(name.lower(), version)]+' >= 1;\n' # module you want to install
+    if forCheck:
+        retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
 
     for key, val in symtable.items():
         for key2, val2 in symtable.items():
@@ -182,8 +200,9 @@ def generateOPB(name, working_set=working_set):
         retstr += '+1 '+cset.pop()+' +1 '+cset.pop()+' <= 1;\n' # conflicts
 
     # update reqdict with working_set
-    for p in working_set:
-        reqdict.update({(p.key, p.version): p.requires()})
+    if not forCheck:
+        for p in working_set:
+            reqdict.update({(p.key, p.version): p.requires()})
     global _REQ
     _REQ = reqdict
     for key, reqlist in reqdict.items():
@@ -194,8 +213,11 @@ def generateOPB(name, working_set=working_set):
                 if entry[0] == req.key and entry[1] in req:
                     depstr += '+1 '+sym+' '
                     switch = True
+            if forCheck:
+                depstr += '+1 '+symtable[(req.key, '0.0-fake')]
             depstr += '>= 0;\n'
             if switch: retstr += depstr # dependencies
+    global _VARDICT
     for key, val in symtable.items():
         _VARDICT.update({val: key})
     return retstr
@@ -210,7 +232,7 @@ def parseSolverOutput(output):
 
     exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
     solvablestr = re.search(r'^s.*', output, flags=re.MULTILINE)
-    temp = solvablestr.split()
+    temp = solvablestr.group(0).split()
     solvable = False
     if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
         solvable = True
@@ -271,6 +293,23 @@ def getFutureState(inst):
         graph.update({i: reqs})
     return graph
 
+def parseCheckOutput(install, uninstall):
+    """Parses the preparsed solver output with respect to fakevariables"""
+
+    retstr = '### Keep the following dependencies:\n'
+    inconStr = ''
+    consistent = True
+    for item in install:
+        if item[1] != '0.0-fake':
+            retstr += item[0]+' version '+item[1]+'\n'
+        else: 
+            consistent = False
+            inconStr += item[0]+'\n'
+    if not consistent:
+        retstr += '### WARNING: The dependencies can only be kept consistent without the following packages:\n'
+        retstr += inconStr
+    return retstr
+
 ###Intern Methods, do not use from ouside modules
 def _callSolver(inputfile, solver='minisat+'):
     """Call a solver with an opb instance.
@@ -283,7 +322,8 @@ def _callSolver(inputfile, solver='minisat+'):
 if __name__ == '__main__':
     loadCache()
     with open('pydyn.opb', 'w') as f:
-        f.write(generateOPB(sys.argv[1]))
+        reqdict, ver = generateMetadata(sys.argv[1])
+        f.write(generateOPB(reqdict, sys.argv[1], ver))
     inst, unin = parseSolverOutput(_callSolver('pydyn.opb', solver='minisat+'))
     installRecommendation(inst, unin)
     saveCache()

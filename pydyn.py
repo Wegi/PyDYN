@@ -25,8 +25,9 @@ def installFor(name):
     Use this function (once) before calling drawXY() / getInstallLists() / getInstallStrings() / etc.
     """
     solver.loadCache()
+    reqdict, version = solver.generateMetadata(name)
     with open('pydyn.opb', 'w') as f:
-        f.write(solver.generateOPB(name, working_set=_working_set if _working_set 
+        f.write(solver.generateOPB(reqdict, name, version, working_set=_working_set if _working_set 
             else solver.generateOPB.__defaults__[0]))
     solver.saveCache()
     global _installList
@@ -103,3 +104,19 @@ def isSolvable():
     """Returns wether the current instance is satisfiable or not. (Run InstallFor() beforehand)"""
 
     return _solvable 
+
+def checkFutureDependency(module, depname):
+    """Check if dependencies of module keep consistent after adding depname
+    to the list of dependencies.
+    """
+
+    solver.loadCache()
+    reqdict, version = solver.generateMetadata(module)
+    reqdict2, version2 = solver.generateMetadata(depname)
+    reqdict.update(reqdict2)
+    with open('pydyn.opb', 'w') as f:
+        f.write(solver.generateOPB(reqdict, module, version, forCheck=True, checkOpts=(depname, version2)))
+    output = solver._callSolver('pydyn.opb', solver=_solver)
+    solver.saveCache()
+    install, uninstall, solvable = solver.parseSolverOutput(output)
+    print(solver.parseCheckOutput(install, uninstall))
