@@ -37,7 +37,7 @@ def parseURL(name):
     resp = urllib.request.urlopen(REP_URL+name+'/')
     data = resp.read()
     text = data.decode('utf-8')
-    linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text) ##TODO Hotfix
+    linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text, re.IGNORECASE) ##TODO Hotfix
     linklist = []
     for link, version in linkiter:
         if link.startswith('http'):
@@ -71,7 +71,7 @@ def getDependencies(paths, name, version):
     paths is the path to the module as .tar.gz. name and version 
     are the name and version of the module, that has to be parsed.
     Parses only if the install_requires String lists all the dependencies.
-    Returns a dictionary of the format {(name, version): [Requirement]}
+    Returns a List of [Requirement] objects.
     """
 
     try:
@@ -79,7 +79,6 @@ def getDependencies(paths, name, version):
     except tarfile.ReadError:
         print('Error: Not a tarfile, ignore it')
     else:
-        depdict = dict()
         try:
             setupfile = tarball.getmember(tarball.next().name+'/setup.py')
         except KeyError:
@@ -97,9 +96,8 @@ def getDependencies(paths, name, version):
             reqlist = []
             for req in deplist:
                 reqlist.append(Requirement.parse(req))
-            depdict = {(name.lower(), version): reqlist}
             f.close()
-        return depdict
+        return reqlist
 
 def newest(linklist):
     """Returns the newest module in a linklist."""
@@ -120,7 +118,7 @@ def generateMetadata(name):
     newver = newest(linklist)
     temp = downloadPackage(newver[0])
     if temp:
-        reqdict = getDependencies(temp, name.lower(), newver[1])
+        reqdict = {(name.lower(), newver[1]) : getDependencies(temp, name.lower(), newver[1])}
         if not reqdict: reqdict = dict()
         todo = reqdict[(name.lower(), newver[1])][:]
         os.unlink(temp) ## Cleanup
@@ -134,18 +132,20 @@ def generateMetadata(name):
                 print('---- Cache miss '+req.key+'-'+linktup[1])
                 ntemp = downloadPackage(linktup[0])
                 if ntemp:
-                    tempdict = getDependencies(ntemp, req.key, linktup[1])
-                    if not tempdict: tempdict = dict()
-                    if req not in todo and (req.key, linktup[1]) not in reqdict:
-                        todo.extend(tempdict[(req.key, linktup[1])])
+                    templist = getDependencies(ntemp, req.key, linktup[1])
+                    if not templist: templist = []
+                    for item in templist:
+                        if item not in todo:
+                            todo.append(item)
                     os.unlink(ntemp) ## Cleanup
                 else:
-                    tempdict = dict()
-                reqdict.update(tempdict)
+                    templist = []
+                reqdict.update({(req.key, linktup[1]): templist})
             elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in reqdict:
                 print('++++ Cache hit '+req.key+'-'+linktup[1])
-                if req not in todo and (req.key, linktup[1]) not in reqdict:
-                        todo.extend(CACHE[(req.key, linktup[1])])
+                for item in CACHE[(req.key, linktup[1])]:
+                    if item not in todo:
+                        todo.append(item)
                 reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
     CACHE.update(reqdict)
     return reqdict, newver[1]
