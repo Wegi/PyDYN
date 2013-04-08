@@ -128,26 +128,28 @@ def generateMetadata(name):
     for req in todo:
         llist = parseURL(req.key)
         for linktup in llist:
-            if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in reqdict:
-                print('---- Cache miss '+req.key+'-'+linktup[1])
-                ntemp = downloadPackage(linktup[0])
-                if ntemp:
-                    templist = getDependencies(ntemp, req.key, linktup[1])
-                    if not templist: templist = []
-                    for item in templist:
+            if linktup[1] in req:
+                if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in reqdict:
+                    print('---- Cache miss '+req.key+'-'+linktup[1])
+                    ntemp = downloadPackage(linktup[0])
+                    if ntemp:
+                        templist = getDependencies(ntemp, req.key, linktup[1])
+                        if not templist: templist = []
+                        for item in templist:
+                            if item not in todo:
+                                todo.append(item)
+                        os.unlink(ntemp) ## Cleanup
+                    else:
+                        templist = []
+                    reqdict.update({(req.key, linktup[1]): templist})
+                elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in reqdict:
+                    print('++++ Cache hit '+req.key+'-'+linktup[1])
+                    for item in CACHE[(req.key, linktup[1])]:
                         if item not in todo:
                             todo.append(item)
-                    os.unlink(ntemp) ## Cleanup
-                else:
-                    templist = []
-                reqdict.update({(req.key, linktup[1]): templist})
-            elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in reqdict:
-                print('++++ Cache hit '+req.key+'-'+linktup[1])
-                for item in CACHE[(req.key, linktup[1])]:
-                    if item not in todo:
-                        todo.append(item)
-                reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+                    reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
     CACHE.update(reqdict)
+    print(len(reqdict))
     return reqdict, newver[1]
 
 def generateOPB(reqdict, name, version, working_set=working_set, forCheck=False, checkOpts=('', '')):
@@ -192,12 +194,29 @@ def generateOPB(reqdict, name, version, working_set=working_set, forCheck=False,
         retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
 
     for key, val in symtable.items():
+        confstr = ''
+        templist = []
+        templist.append(val)
         for key2, val2 in symtable.items():
             if key[0] == key2[0] and key[1] != key2[1]:
-                conflicts.add(frozenset([symtable[key], symtable[key2]]))
-    for fset in conflicts:
-        cset = set(fset)
-        retstr += '+1 '+cset.pop()+' +1 '+cset.pop()+' <= 1;\n' # conflicts
+                templist.append(val2)
+        fset = frozenset(templist)
+        conflicts.add(fset)
+    for item in conflicts:
+        newset = set(item)
+        for var in newset:
+            confstr += '+1 '+var+' '
+        confstr += '<= 1;\n'
+    retstr += confstr  #conflicts
+
+##TODO refactor conflicts
+#    for key, val in symtable.items():
+#        for key2, val2 in symtable.items():
+#            if key[0] == key2[0] and key[1] != key2[1]:
+#                conflicts.add(frozenset([symtable[key], symtable[key2]]))
+#    for fset in conflicts:
+#        cset = set(fset)
+#        retstr += '+1 '+cset.pop()+' +1 '+cset.pop()+' <= 1;\n' # conflicts
 
     # update reqdict with working_set
     if not forCheck:
@@ -225,7 +244,7 @@ def generateOPB(reqdict, name, version, working_set=working_set, forCheck=False,
 def parseSolverOutput(output):
     """Parse the output of a opb.Solver.
 
-    The output of the solve has to be in DIMACS format.
+    The output of the solver has to be in DIMACS format.
     The output of this method are two lists which indicate
     which modules are to be installed and which are not.
     """
