@@ -1,0 +1,95 @@
+####################### README for the WBO solver (v2.0) ######################
+
+WBO is an unsatisfiability-based solver for Weighted Boolean Optimization. It
+can also solve Pseudo-Boolean Solving and Optimization problem instances,  as
+well as Maximum Satisfiability (MaxSAT) instances or any of its partial and
+weighted variants.
+
+###############################################################################
+
+Usage of the solver: ./wbo [options] <input-file>
+The following options are available in this version of WBO:
+
+# -file-format   = {cnf,wcnf,opb,wbo} (default wcnf) 
+'cnf'  : takes as input file an unweighted MaxSAT instance 
+
+'wcnf' : takes as input file a partial or weighted MaxSAT instance 
+
+'opb'  : takes as input file a Pseudo-Boolean instance
+
+'wbo'  : takes as input file a Weighted Boolean Optimization instance
+
+
+# -preprocessor  = {no,yes} (default yes) 
+(Dis)enables preprocessing techniques for optimization formulas [MML10]
+
+
+# -search-mode   = {normal,part-weight,part-graph,part-dyn} (default normal)
+'normal'      : uses the unsatisfiability-based algorithm proposed for Weighted
+Boolean Optimization [MMSP09] 
+
+'part-weight' : for weighted problems it uses a partition-based algorithm 
+using the weight of the soft clauses [MML12] 
+
+'part-graph'  : for weighted problems it uses a partition-based algorithm 
+using a graph based approach [MML12] 
+
+'part-dyn'    : dynamically chooses between 'normal', 'part-weight' and 'part-
+graph' based on the instance properties [MML12]
+
+
+# -part-graph    = <num> (only for search mode 'part-graph' and 'part-dyn',
+default 16) 
+Number of partitions that are created when using the graph based approach
+
+
+# -amo           = {parwise, ladder, bitwise, commander, product, sequential,
+totalizer, sorters, pb} (default pb) 
+Encoding for the at-most-one cardinality constraints [MML11]
+
+
+# -time-limit    = <num> (default 1800 sec.) 
+Time limit for finding the optimal solution
+
+###############################################################################
+
+For results of WBO on several types of instances, please check the results of
+the last evaluations:
+
+MaxSAT evaluation:  
+http://www.maxsat.udl.cat/
+
+Pseudo-Boolean and Weighted Boolean Optimization evaluation:  
+http://www.cril.univ-artois.fr/PB12/
+
+Benchmarks and description of solver input files are also available at the 
+above webpages.
+
+
+References:
+
+[MML12]  R. Martins, V. Manquinho, I. Lynce: On Partitioning for Maximum
+Satisfiability. ECAI 2012: 913-914
+
+[MML11]  R. Martins, V. Manquinho, I. Lynce: Exploiting Cardinality Encodings
+in Parallel Maximum Satisfiability. ICTAI 2011: 313-320
+
+[MML10]  V. Manquinho, R. Martins, I. Lynce: Improving Unsatisfiability-Based
+Algorithms for Boolean Optimization. SAT 2010: 181-193
+
+[MMSP09] V. Manquinho, J. Marques-Silva, J. Planes: Algorithms for Weighted
+Boolean Optimization. SAT 2009: 495-508
+
+###############################################################################
+
+Authors: Vasco Manquinho, Ruben Martins, Ines Lynce 
+Contributors: Joao Marques-Silva, Jordi Planes
+
+The software packages are made available solely for research and educational
+purposes. If you wish to use it for other purposes, you must contacts the
+authors for permission.
+
+To contact the authors please send an email to:
+wbo@sat.inesc-id.pt
+
+###############################################################################

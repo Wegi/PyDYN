@@ -112,6 +112,9 @@ def generateMetadata(name):
     """Generates a complete Dictionary of all (recursive) Dependencies of name.
 
     Returns a dictionary of the format {(name, version): [Requirement]}
+    The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly.
+    If they're or some other == dependency is not met by another module, it can't be installed 
+    simultaniously.
     """
 
     linklist = parseURL(name)
@@ -125,6 +128,9 @@ def generateMetadata(name):
     else:
         reqdict = dict()
         todo = []
+    strict = dict()
+    for i in todo:
+        strict.update({i.key: i})  ##Have to be fullfilled at all times
     for req in todo:
         llist = parseURL(req.key)
         for linktup in llist:
@@ -141,13 +147,22 @@ def generateMetadata(name):
                         os.unlink(ntemp) ## Cleanup
                     else:
                         templist = []
-                    reqdict.update({(req.key, linktup[1]): templist})
+                    #update only if the requirement meets the strict requirements
+                    if req.key in strict:
+                        if linktup[1] in strict[req.key]:
+                            reqdict.update({(req.key, linktup[1]): templist})
+                    else: 
+                        reqdict.update({(req.key, linktup[1]): templist})
                 elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in reqdict:
                     print('++++ Cache hit '+req.key+'-'+linktup[1])
                     for item in CACHE[(req.key, linktup[1])]:
                         if item not in todo:
                             todo.append(item)
-                    reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+                    if req.key in strict:
+                        if linktup[1] in strict[req.key]:
+                            reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+                    else:
+                        reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
     CACHE.update(reqdict)
     print(len(reqdict))
     return reqdict, newver[1]
@@ -158,7 +173,7 @@ def generateOPB(reqdict, name, version, working_set=working_set, forCheck=False,
     The Requirement-dictionary gets parsed and a opb Instance of the
     Installation-Problem gets created. The resulting opb String
     should be parsable by all PBO-Solver, who comply to the
-    DIRACS Format.
+    DIMACS Format.
 
     forCheck has to be True only if yo use this method from checkFutureDependency() in the api.
     """
@@ -249,6 +264,7 @@ def parseSolverOutput(output):
     which modules are to be installed and which are not.
     """
 
+    print(output)
     exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
     solvablestr = re.search(r'^s.*', output, flags=re.MULTILINE)
     temp = solvablestr.group(0).split()
@@ -330,13 +346,15 @@ def parseCheckOutput(install, uninstall):
     return retstr
 
 ###Intern Methods, do not use from ouside modules
-def _callSolver(inputfile, solver='minisat+'):
+def _callSolver(inputfile, solver='./wbo/wbo', options=[]):
     """Call a solver with an opb instance.
 
     Returns output in DIMACS format.
     """
-
-    return subprocess.check_output([solver, inputfile]).decode('utf-8')
+    optionstr = ' '
+    for i in options:
+        optionstr += i+' '
+    return subprocess.getoutput(solver+optionstr+inputfile)
 
 if __name__ == '__main__':
     loadCache()

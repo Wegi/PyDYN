@@ -13,7 +13,8 @@ import depgraph
 
 from pkg_resources import WorkingSet
 
-_solver = 'minisat+'
+_solver = './wbo/wbo'
+_solvoptions = ['-file-format=opb']
 _working_set = None
 _installList = []
 _uninstallList = []
@@ -33,7 +34,8 @@ def installFor(name):
     global _installList
     global _uninstallList
     global _solvable
-    _installList, _uninstallList, _solvable = solver.parseSolverOutput(solver._callSolver('pydyn.opb', solver=_solver))
+    _installList, _uninstallList, _solvable = \
+    solver.parseSolverOutput(solver._callSolver('pydyn.opb', solver=_solver, options=_solvoptions))
 
 def loadCache(path):
     """Load another cache file."""
