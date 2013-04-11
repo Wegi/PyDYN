@@ -23,12 +23,17 @@ class DepInstance:
         if wset: self.wset = wset
         else: self.wset = pkg_resources.working_set
 
-        reqdict, version = solver.generateMetadata(name)
+        self.transInst = solver.TranslationInstance(name)
+        self.transInst.generateMetadata()
+        
+        solver.saveCache()
+
+    def solveInstance(self):
+        """Solve the Instance. Creates an opb file and inputs it in the solver"""
         with open('pydyn.opb', 'w') as f:
-            f.write(solver.generateOPB(reqdict, name, version, working_set=self.wset))
-        solver.saveCache() 
-        self.installList, self.uninstallList, self.solvable = \
-        solver.parseSolverOutput(solver._callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions))
+            f.write(self.transInst.generateOPB(working_set=self.wset))
+        output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
+        self.installList, self.uninstallList, self.solvable = self.transInst.parseSolverOutput(output)
 
     def getInstallLists(self):
         """Get two lists of which modules to install or uninstall.
@@ -77,7 +82,7 @@ class DepInstance:
 
         A module should have been parsed with installFor() before calling this function
         """
-        graph = solver.getFutureState(self.installList)
+        graph = self.transInst.getFutureState(self.installList)
         depgraph.graphToPNG(graph)
 
     def drawSVG(self):
@@ -86,13 +91,31 @@ class DepInstance:
         A module should have been parsed with installFor() before calling this function
         graphviz package has to be installed on UNIX Systems.
         """
-        graph = solver.getFutureState(self.installList)
+        graph = self.transInst.getFutureState(self.installList)
         depgraph.graphToSVG(graph)
 
     def isSolvable(self):
         """Returns wether the current instance is satisfiable or not. (Run InstallFor() beforehand)"""
 
         return self.solvable 
+
+    def checkFutureDependency(self, depname):
+        """Check if dependencies of module keep consistent after adding depname
+        to the list of dependencies.
+        """
+
+        solver.loadCache()
+        module = self.transInst.name
+        version = self.transInst.version
+        self.transInst.addDependency(depname)
+        self.transInst.generateMetadata()
+
+        with open('pydyn.opb', 'w') as f:
+            f.write(self.transInst.generateOPB(forCheck=True, checkOpts=(module, version)))
+        output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
+        solver.saveCache()
+        self.installList, self.uninstallList, self.solvable = self.transInst.parseSolverOutput(output)
+        print(solver.parseCheckOutput(self.installList))
 
 def checkFutureDependency(module, depname):
     """Check if dependencies of module keep consistent after adding depname
@@ -105,7 +128,7 @@ def checkFutureDependency(module, depname):
     reqdict.update(reqdict2)
     with open('pydyn.opb', 'w') as f:
         f.write(solver.generateOPB(reqdict, module, version, forCheck=True, checkOpts=(depname, version2)))
-    output = solver._callSolver('pydyn.opb', solver=_solver)
+    output = solver.callSolver('pydyn.opb', solver=_solver)
     solver.saveCache()
     install, uninstall, solvable = solver.parseSolverOutput(output)
     print(solver.parseCheckOutput(install, uninstall))

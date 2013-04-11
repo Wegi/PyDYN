@@ -19,9 +19,190 @@ REP_URL = 'https://pypi.python.org/simple/'
 REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
 FAKEWEIGHT = '+9001'  ##fake metamodule
-_VARDICT = dict()
 CACHE = dict()
-_REQ = dict()
+
+class TranslationInstance:
+
+    def __init__(self, name, version=''):
+        self.name = name
+        self.version = version
+        self.reqdict = dict()
+        self.vardict = dict()
+
+    def addDependency(self, name, version=''):
+        self.name = name
+        self.version = version
+
+    def generateMetadata(self):
+        """Generates a complete Dictionary of all (recursive) Dependencies of name.
+
+        Returns a dictionary of the format {(name, version): [Requirement]}
+        The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly.
+        updateFlag must be True only if the requirement-dictionary should be updated and not replaced.
+        i.e. if you want to install 2 modules at the same time. 
+        """
+
+        linklist = parseURL(self.name)
+        newver = newest(linklist)
+        temp = downloadPackage(newver[0])
+        self.version = newver[1]
+        if temp:
+            self.reqdict.update({(self.name.lower(), self.version) : getDependencies(temp, self.name.lower(), self.version)})
+            if not self.reqdict: self.reqdict = dict()
+            todo = self.reqdict[(self.name.lower(), newver[1])][:]
+            os.unlink(temp) ## Cleanup
+        else:
+            todo = []
+        strict = dict()
+        for i in todo:
+            strict.update({i.key: i})  ##Have to be fullfilled at all times
+        for req in todo:
+            llist = parseURL(req.key)
+            for linktup in llist:
+                if linktup[1] in req:
+                    if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in self.reqdict:
+                        print('---- Cache miss '+req.key+'-'+linktup[1])
+                        ntemp = downloadPackage(linktup[0])
+                        if ntemp:
+                            templist = getDependencies(ntemp, req.key, linktup[1])
+                            if not templist: templist = []
+                            for item in templist:
+                                if item not in todo:
+                                    todo.append(item)
+                            os.unlink(ntemp) ## Cleanup
+                        else:
+                            templist = []
+                        #update only if the requirement meets the strict requirements
+                        if req.key in strict:
+                            if linktup[1] in strict[req.key]:
+                                self.reqdict.update({(req.key, linktup[1]): templist})
+                        else: 
+                            self.reqdict.update({(req.key, linktup[1]): templist})
+                    elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in self.reqdict:
+                        print('++++ Cache hit '+req.key+'-'+linktup[1])
+                        for item in CACHE[(req.key, linktup[1])]:
+                            if item not in todo:
+                                todo.append(item)
+                        if req.key in strict:
+                            if linktup[1] in strict[req.key]:
+                                self.reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+                        else:
+                            self.reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+        CACHE.update(self.reqdict)
+        print(len(self.reqdict))
+
+    def generateOPB(self, working_set=working_set, forCheck=False, checkOpts=('', '')):
+        """Generate a opb Representation of a requirement-dict.
+
+        The Requirement-dictionary gets parsed and a opb Instance of the
+        Installation-Problem gets created. The resulting opb String
+        should be parsable by all PBO-Solver, who comply to the
+        DIMACS Format.
+
+        forCheck has to be True only if yo use this method from checkFutureDependency() in the api.
+        checkOpts is a tuple that holds name and version of the module to which you add dependencies.
+        """
+
+        retstr = ''
+        minstring = 'min: '
+        fakenames = set() ##dictionary for fakepackages
+        conflicts = set()
+        symtable = dict()
+        symcounter = 1
+        if not forCheck:
+            for p in working_set:
+                symtable.update({(p.key, p.version): 'x'+str(symcounter)})
+                symcounter += 1
+                minstring += REMWEIGHT+' '+symtable[(p.key, p.version)]+' '
+        for key, reqlist in self.reqdict.items():
+            if key not in symtable:
+                symtable.update({key: 'x'+str(symcounter)})
+                symcounter += 1
+            minstring += NEWWEIGHT+' '+symtable[key]+' '
+            if forCheck:
+                for req in reqlist:
+                    fakenames.add(req.key)
+        if forCheck:
+            for item in fakenames:
+                symtable.update({(item.lower(), '0.0-fake'): 'x'+str(symcounter)})
+                minstring += FAKEWEIGHT+' x'+str(symcounter)+' '
+                symcounter += 1
+        minstring += ';\n'
+        retstr += minstring # minimization function
+        retstr += '+1 '+symtable[(self.name.lower(), self.version)]+' >= 1;\n' # module you want to install
+        if forCheck:
+            retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
+
+        for key, val in symtable.items():
+            confstr = ''
+            templist = []
+            templist.append(val)
+            for key2, val2 in symtable.items():
+                if key[0] == key2[0] and key[1] != key2[1]:
+                    templist.append(val2)
+            fset = frozenset(templist)
+            conflicts.add(fset)
+        for item in conflicts:
+            newset = set(item)
+            for var in newset:
+                confstr += '+1 '+var+' '
+            confstr += '<= 1;\n'
+        retstr += confstr  #conflicts
+
+        # update reqdict with working_set
+        if not forCheck:
+            for p in working_set:
+                self.reqdict.update({(p.key, p.version): p.requires()})
+        for key, reqlist in self.reqdict.items():
+            for req in reqlist:
+                depstr = '-1 '+symtable[key]+' '
+                switch = False
+                for entry, sym in symtable.items():
+                    if entry[0] == req.key and entry[1] in req:
+                        depstr += '+1 '+sym+' '
+                        switch = True
+                if forCheck:
+                    depstr += '+1 '+symtable[(req.key, '0.0-fake')]+' '
+                depstr += '>= 0;\n'
+                if switch: retstr += depstr # dependencies
+        for key, val in symtable.items():
+            self.vardict.update({val: key})
+        return retstr
+
+    def parseSolverOutput(self, output):
+        """Parse the output of a opb.Solver.
+
+        The output of the solver has to be in DIMACS format.
+        The output of this method are two lists which indicate
+        which modules are to be installed and which are not.
+        """
+
+        exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
+        solvablestr = re.search(r'^s.*', output, flags=re.MULTILINE)
+        temp = solvablestr.group(0).split()
+        solvable = False
+        if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
+            solvable = True
+        elif temp[1] == 'UNSATISFIABLE':
+            solvable = False
+        variables = exp.group(0).split()
+        install = [self.vardict[var] for var in variables if var.startswith('x')]
+        uninstall = [self.vardict[var[1:]] for var in variables if var.startswith('-')]
+        return install, uninstall, solvable 
+
+    def getFutureState(self, inst):
+        """Give back a graph for drawing methods."""
+
+        graph = dict()
+        for i in inst:
+            reqs = []
+            for x in self.reqdict[i]:
+                for j in inst:
+                    if x.key == j[0]:
+                        reqs.append(j)
+                        break
+            graph.update({i: reqs})
+        return graph
 
 if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
     urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
@@ -68,7 +249,7 @@ def downloadPackage(link):
 def getDependencies(paths, name, version):
     """Parses Dependencies from setup.py of tarred module.
 
-    paths is the path to the module as .tar.gz. name and version 
+    paths is the path to the module as .tar.gz. name and version
     are the name and version of the module, that has to be parsed.
     Parses only if the install_requires String lists all the dependencies.
     Returns a List of [Requirement] objects.
@@ -108,176 +289,6 @@ def newest(linklist):
             newest_version = (link, version)
     return newest_version
 
-def generateMetadata(name):
-    """Generates a complete Dictionary of all (recursive) Dependencies of name.
-
-    Returns a dictionary of the format {(name, version): [Requirement]}
-    The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly.
-    If they're or some other == dependency is not met by another module, it can't be installed 
-    simultaniously.
-    """
-
-    linklist = parseURL(name)
-    newver = newest(linklist)
-    temp = downloadPackage(newver[0])
-    if temp:
-        reqdict = {(name.lower(), newver[1]) : getDependencies(temp, name.lower(), newver[1])}
-        if not reqdict: reqdict = dict()
-        todo = reqdict[(name.lower(), newver[1])][:]
-        os.unlink(temp) ## Cleanup
-    else:
-        reqdict = dict()
-        todo = []
-    strict = dict()
-    for i in todo:
-        strict.update({i.key: i})  ##Have to be fullfilled at all times
-    for req in todo:
-        llist = parseURL(req.key)
-        for linktup in llist:
-            if linktup[1] in req:
-                if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in reqdict:
-                    print('---- Cache miss '+req.key+'-'+linktup[1])
-                    ntemp = downloadPackage(linktup[0])
-                    if ntemp:
-                        templist = getDependencies(ntemp, req.key, linktup[1])
-                        if not templist: templist = []
-                        for item in templist:
-                            if item not in todo:
-                                todo.append(item)
-                        os.unlink(ntemp) ## Cleanup
-                    else:
-                        templist = []
-                    #update only if the requirement meets the strict requirements
-                    if req.key in strict:
-                        if linktup[1] in strict[req.key]:
-                            reqdict.update({(req.key, linktup[1]): templist})
-                    else: 
-                        reqdict.update({(req.key, linktup[1]): templist})
-                elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in reqdict:
-                    print('++++ Cache hit '+req.key+'-'+linktup[1])
-                    for item in CACHE[(req.key, linktup[1])]:
-                        if item not in todo:
-                            todo.append(item)
-                    if req.key in strict:
-                        if linktup[1] in strict[req.key]:
-                            reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
-                    else:
-                        reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
-    CACHE.update(reqdict)
-    print(len(reqdict))
-    return reqdict, newver[1]
-
-def generateOPB(reqdict, name, version, working_set=working_set, forCheck=False, checkOpts=('', '')):
-    """Generate a opb Representation of a requirement-dict.
-
-    The Requirement-dictionary gets parsed and a opb Instance of the
-    Installation-Problem gets created. The resulting opb String
-    should be parsable by all PBO-Solver, who comply to the
-    DIMACS Format.
-
-    forCheck has to be True only if yo use this method from checkFutureDependency() in the api.
-    """
-
-    retstr = ''
-    minstring = 'min: '
-    fakenames = set() ##dictionary for fakepackages
-    conflicts = set()
-    symtable = dict()
-    symcounter = 1
-    if not forCheck:
-        for p in working_set:
-            symtable.update({(p.key, p.version): 'x'+str(symcounter)})
-            symcounter += 1
-            minstring += REMWEIGHT+' '+symtable[(p.key, p.version)]+' '
-    for key, reqlist in reqdict.items():
-        if key not in symtable:
-            symtable.update({key: 'x'+str(symcounter)})
-            symcounter += 1
-        minstring += NEWWEIGHT+' '+symtable[key]+' '
-        if forCheck:
-            for req in reqlist:
-                fakenames.add(req.key)
-    if forCheck:
-        for item in fakenames:
-            symtable.update({(item.lower(), '0.0-fake'): 'x'+str(symcounter)})
-            minstring += FAKEWEIGHT+' x'+str(symcounter)+' '
-            symcounter += 1
-    minstring += ';\n'
-    retstr += minstring # minimization function
-    retstr += '+1 '+symtable[(name.lower(), version)]+' >= 1;\n' # module you want to install
-    if forCheck:
-        retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
-
-    for key, val in symtable.items():
-        confstr = ''
-        templist = []
-        templist.append(val)
-        for key2, val2 in symtable.items():
-            if key[0] == key2[0] and key[1] != key2[1]:
-                templist.append(val2)
-        fset = frozenset(templist)
-        conflicts.add(fset)
-    for item in conflicts:
-        newset = set(item)
-        for var in newset:
-            confstr += '+1 '+var+' '
-        confstr += '<= 1;\n'
-    retstr += confstr  #conflicts
-
-##TODO refactor conflicts
-#    for key, val in symtable.items():
-#        for key2, val2 in symtable.items():
-#            if key[0] == key2[0] and key[1] != key2[1]:
-#                conflicts.add(frozenset([symtable[key], symtable[key2]]))
-#    for fset in conflicts:
-#        cset = set(fset)
-#        retstr += '+1 '+cset.pop()+' +1 '+cset.pop()+' <= 1;\n' # conflicts
-
-    # update reqdict with working_set
-    if not forCheck:
-        for p in working_set:
-            reqdict.update({(p.key, p.version): p.requires()})
-    global _REQ
-    _REQ = reqdict
-    for key, reqlist in reqdict.items():
-        for req in reqlist:
-            depstr = '-1 '+symtable[key]+' '
-            switch = False
-            for entry, sym in symtable.items():
-                if entry[0] == req.key and entry[1] in req:
-                    depstr += '+1 '+sym+' '
-                    switch = True
-            if forCheck:
-                depstr += '+1 '+symtable[(req.key, '0.0-fake')]
-            depstr += '>= 0;\n'
-            if switch: retstr += depstr # dependencies
-    global _VARDICT
-    for key, val in symtable.items():
-        _VARDICT.update({val: key})
-    return retstr
-
-def parseSolverOutput(output):
-    """Parse the output of a opb.Solver.
-
-    The output of the solver has to be in DIMACS format.
-    The output of this method are two lists which indicate
-    which modules are to be installed and which are not.
-    """
-
-    print(output)
-    exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
-    solvablestr = re.search(r'^s.*', output, flags=re.MULTILINE)
-    temp = solvablestr.group(0).split()
-    solvable = False
-    if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
-        solvable = True
-    elif temp[1] == 'UNSATISFIABLE':
-        solvable = False
-    variables = exp.group(0).split()
-    install = [_VARDICT[var] for var in variables if var.startswith('x')]
-    uninstall = [_VARDICT[var[1:]] for var in variables if var.startswith('-')]
-    return install, uninstall, solvable 
-
 def installRecommendation(install, uninstall, working_set=working_set):
     """Human Readable advice on which modules have to be installed on
     current Working Set.
@@ -312,23 +323,7 @@ def saveCache(path='pydyn.cache'):
     except IOError:
         print('Warning: Could not save Cache')
 
-def getFutureState(inst):
-    """Give back a graph for drawing methods.
-
-    Don't clear the global _REQ after the corresponding opb generation.
-    """
-    graph = dict()
-    for i in inst:
-        reqs = []
-        for x in _REQ[i]:
-            for j in inst:
-                if x.key == j[0]:
-                    reqs.append(j)
-                    break
-        graph.update({i: reqs})
-    return graph
-
-def parseCheckOutput(install, uninstall):
+def parseCheckOutput(install):
     """Parses the preparsed solver output with respect to fakevariables"""
 
     retstr = '### Keep the following dependencies:\n'
@@ -345,8 +340,7 @@ def parseCheckOutput(install, uninstall):
         retstr += inconStr
     return retstr
 
-###Intern Methods, do not use from ouside modules
-def _callSolver(inputfile, solver='./wbo/wbo', options=[]):
+def callSolver(inputfile, solver='./wbo/wbo', options=[]):
     """Call a solver with an opb instance.
 
     Returns output in DIMACS format.
@@ -355,12 +349,3 @@ def _callSolver(inputfile, solver='./wbo/wbo', options=[]):
     for i in options:
         optionstr += i+' '
     return subprocess.getoutput(solver+optionstr+inputfile)
-
-if __name__ == '__main__':
-    loadCache()
-    with open('pydyn.opb', 'w') as f:
-        reqdict, ver = generateMetadata(sys.argv[1])
-        f.write(generateOPB(reqdict, sys.argv[1], ver))
-    inst, unin = parseSolverOutput(_callSolver('pydyn.opb', solver='minisat+'))
-    installRecommendation(inst, unin)
-    saveCache()
