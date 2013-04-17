@@ -12,7 +12,41 @@ import solver
 import depgraph
 import pkg_resources
 
-class DepInstance:
+class Solution:
+
+    def __init__(self, name, installList, uninstallList, solvable, opb_translator):
+        self.name = name
+        self.installList = installList
+        self.uninstallList = uninstallList
+        self.solvable = solvable
+        self.opb_translator = opb_translator
+
+
+    def getInstallStrings(self):
+        """Parses the output of installFor().
+
+        Get a Human Readable String which gives Install / uninstall advice.
+        """
+        solver.installRecommendation(self.installList, self.uninstallList)
+
+    def drawPNG(self):
+        """Output a .png file with the dependency graph after parsed module would be installed.
+
+        A module should have been parsed with installFor() before calling this function
+        """
+        graph = self.opb_translator.getFutureState(self.installList)
+        depgraph.graphToPNG(graph)
+
+    def drawSVG(self):
+        """Output a .svg file with the dependency graph after parsed module would be installed.
+
+        A module should have been parsed with installFor() before calling this function
+        graphviz package has to be installed on UNIX Systems.
+        """
+        graph = self.opb_translator.getFutureState(self.installList)
+        depgraph.graphToSVG(graph)
+
+class Problem:
 
     def __init__(self, name, solverprog='./wbo/wbo', solverOptions=['-file-format=opb'], wset=None):
         """Set the parameter for the module which you want to install."""
@@ -20,28 +54,22 @@ class DepInstance:
         solver.loadCache()
         self.solverprog = solverprog
         self.solverOptions = solverOptions
+        self.name = name
         if wset: self.wset = wset
         else: self.wset = pkg_resources.working_set
 
-        self.transInst = solver.TranslationInstance(name)
-        self.transInst.generateMetadata()
+        self.opb_translator = solver.OPBTranslator(name)
+        self.opb_translator.generateMetadata()
         
         solver.saveCache()
 
-    def solveInstance(self):
+    def solve(self):
         """Solve the Instance. Creates an opb file and inputs it in the solver"""
         with open('pydyn.opb', 'w') as f:
-            f.write(self.transInst.generateOPB(working_set=self.wset))
+            f.write(self.opb_translator.generateOPB(working_set=self.wset))
         output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
-        self.installList, self.uninstallList, self.solvable = self.transInst.parseSolverOutput(output)
-
-    def getInstallLists(self):
-        """Get two lists of which modules to install or uninstall.
-
-        Returns two lists install, uninstall. 
-        The Content of the Lists is a tuple with (name, version).
-        """
-        return self.installList, self.uninstallList
+        installList, uninstallList, solvable = self.opb_translator.parseSolverOutput(output)
+        return Solution(self.name, installList, uninstallList, solvable, self.opb_translator)
 
     def setSolver(self, solverprog, solverOptions=[]):
         """Set the opb-solver to use. (standard is minisat+)
@@ -70,65 +98,21 @@ class DepInstance:
         """
         self.wset = pkg_resources.working_set
 
-    def getInstallStrings(self):
-        """Parses the output of installFor().
-
-        Get a Human Readable String which gives Install / uninstall advice.
-        """
-        solver.installRecommendation(self.installList, self.uninstallList)
-
-    def drawPNG(self):
-        """Output a .png file with the dependency graph after parsed module would be installed.
-
-        A module should have been parsed with installFor() before calling this function
-        """
-        graph = self.transInst.getFutureState(self.installList)
-        depgraph.graphToPNG(graph)
-
-    def drawSVG(self):
-        """Output a .svg file with the dependency graph after parsed module would be installed.
-
-        A module should have been parsed with installFor() before calling this function
-        graphviz package has to be installed on UNIX Systems.
-        """
-        graph = self.transInst.getFutureState(self.installList)
-        depgraph.graphToSVG(graph)
-
-    def isSolvable(self):
-        """Returns wether the current instance is satisfiable or not. (Run InstallFor() beforehand)"""
-
-        return self.solvable 
-
     def checkFutureDependency(self, depname):
         """Check if dependencies of module keep consistent after adding depname
         to the list of dependencies.
         """
 
         solver.loadCache()
-        module = self.transInst.name
-        version = self.transInst.version
-        self.transInst.addDependency(depname)
-        self.transInst.generateMetadata()
+        module = self.opb_translator.name
+        version = self.opb_translator.version
+        self.opb_translator.addDependency(depname)
+        self.opb_translator.generateMetadata()
 
         with open('pydyn.opb', 'w') as f:
-            f.write(self.transInst.generateOPB(forCheck=True, checkOpts=(module, version)))
+            f.write(self.opb_translator.generateOPB(forCheck=True, checkOpts=(module, version)))
         output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
         solver.saveCache()
-        self.installList, self.uninstallList, self.solvable = self.transInst.parseSolverOutput(output)
+        installList, uninstallList, solvable = self.opb_translator.parseSolverOutput(output)
+        return Solution(self.name, installList, uninstallList, solvable)
         print(solver.parseCheckOutput(self.installList))
-
-def checkFutureDependency(module, depname):
-    """Check if dependencies of module keep consistent after adding depname
-    to the list of dependencies.
-    """
-
-    solver.loadCache()
-    reqdict, version = solver.generateMetadata(module)
-    reqdict2, version2 = solver.generateMetadata(depname)
-    reqdict.update(reqdict2)
-    with open('pydyn.opb', 'w') as f:
-        f.write(solver.generateOPB(reqdict, module, version, forCheck=True, checkOpts=(depname, version2)))
-    output = solver.callSolver('pydyn.opb', solver=_solver)
-    solver.saveCache()
-    install, uninstall, solvable = solver.parseSolverOutput(output)
-    print(solver.parseCheckOutput(install, uninstall))

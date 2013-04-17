@@ -21,7 +21,7 @@ NEWWEIGHT = '+20'
 FAKEWEIGHT = '+9001'  ##fake metamodule
 CACHE = dict()
 
-class TranslationInstance:
+class OPBTranslator:
 
     def __init__(self, name, version=''):
         self.name = name
@@ -89,7 +89,6 @@ class TranslationInstance:
                         else:
                             self.reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
         CACHE.update(self.reqdict)
-        print(len(self.reqdict))
 
     def generateOPB(self, working_set=working_set, forCheck=False, checkOpts=('', '')):
         """Generate a opb Representation of a requirement-dict.
@@ -218,7 +217,7 @@ def parseURL(name):
     resp = urllib.request.urlopen(REP_URL+name+'/')
     data = resp.read()
     text = data.decode('utf-8')
-    linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text, re.IGNORECASE) ##TODO Hotfix
+    linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text, re.IGNORECASE)
     linklist = []
     for link, version in linkiter:
         if link.startswith('http'):
