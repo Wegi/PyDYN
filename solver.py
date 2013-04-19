@@ -22,6 +22,7 @@ FAKEWEIGHT = '+9001'  ##fake metamodule
 CACHE = dict()
 
 class OPBTranslator:
+    """An Class to transalte Module-Metadata to OPB and back"""
 
     def __init__(self, name, version=''):
         self.name = name
@@ -37,11 +38,9 @@ class OPBTranslator:
         """Generates a complete Dictionary of all (recursive) Dependencies of name.
 
         Returns a dictionary of the format {(name, version): [Requirement]}
-        The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly.
-        updateFlag must be True only if the requirement-dictionary should be updated and not replaced.
-        i.e. if you want to install 2 modules at the same time. 
+        The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly. 
         """
-
+        
         linklist = parseURL(self.name)
         newver = newest(list(linklist))
         temp = downloadPackage(newver[0])
@@ -59,35 +58,31 @@ class OPBTranslator:
         for req in todo:
             llist = parseURL(req.key)
             for linktup in llist:
-                if linktup[1] in req:
+                if linktup[1] in req:  ##only use if linktup fullfills requirement
+                    templist = []
                     if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in self.reqdict:
+                        #if its a cache miss, fetch the new data
                         print('---- Cache miss '+req.key+'-'+linktup[1])
                         ntemp = downloadPackage(linktup[0])
                         if ntemp:
                             templist = getDependencies(ntemp, req.key, linktup[1])
-                            if not templist: templist = []
-                            for item in templist:
-                                if item not in todo:
-                                    todo.append(item)
+                            for item in templist and item not in todo:
+                                todo.append(item)
                             os.unlink(ntemp) ## Cleanup
-                        else:
-                            templist = []
-                        #update only if the requirement meets the strict requirements
-                        if req.key in strict:
-                            if linktup[1] in strict[req.key]:
-                                self.reqdict.update({(req.key, linktup[1]): templist})
-                        else: 
-                            self.reqdict.update({(req.key, linktup[1]): templist})
+
                     elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in self.reqdict:
+                        #cache hit take the data from the cache
                         print('++++ Cache hit '+req.key+'-'+linktup[1])
                         for item in CACHE[(req.key, linktup[1])]:
                             if item not in todo:
                                 todo.append(item)
-                        if req.key in strict:
-                            if linktup[1] in strict[req.key]:
-                                self.reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
-                        else:
-                            self.reqdict.update({(req.key, linktup[1]): CACHE[(req.key, linktup[1])]})
+                        templist = CACHE[(req.key, linktup[1])]
+                    #update only if the requirement meets the strict requirements
+                    if req.key in strict:
+                        if linktup[1] in strict[req.key]:
+                            self.reqdict.update({(req.key, linktup[1]): templist})
+                    else:
+                        self.reqdict.update({(req.key, linktup[1]): templist})
         CACHE.update(self.reqdict)
 
     def generateOPB(self, working_set=working_set, forCheck=False, checkOpts=('', '')):
