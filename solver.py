@@ -43,7 +43,7 @@ class OPBTranslator:
         """
 
         linklist = parseURL(self.name)
-        newver = newest(linklist)
+        newver = newest(list(linklist))
         temp = downloadPackage(newver[0])
         self.version = newver[1]
         if temp:
@@ -218,14 +218,13 @@ def parseURL(name):
     data = resp.read()
     text = data.decode('utf-8')
     linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text, re.IGNORECASE)
-    linklist = []
     for link, version in linkiter:
         if link.startswith('http'):
-            linklist.append((link, version))
+            #linklist.append((link, version))
+            yield (link, version)
         else:
-            linklist.append((REP_URL+name+'/'+link, version))
-    return linklist
-    #TODO zip packages
+            #linklist.append((REP_URL+name+'/'+link, version))
+            yield (REP_URL+name+'/'+link, version)
 
 def downloadPackage(link):
     """Downloads a module.
