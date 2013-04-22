@@ -11,6 +11,7 @@ Create a DepInstance Object first if you want to work with dependencys and not j
 import solver
 import depgraph
 import pkg_resources
+import copy
 
 class Solution:
 
@@ -104,6 +105,7 @@ class Problem:
         """
 
         solver.loadCache()
+        backup = copy.deepcopy(self.opb_translator)
         module = self.opb_translator.name
         version = self.opb_translator.version
         self.opb_translator.addDependency(depname)
@@ -114,5 +116,6 @@ class Problem:
         output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
         solver.saveCache()
         installList, uninstallList, solvable = self.opb_translator.parseSolverOutput(output)
-        return Solution(self.name, installList, uninstallList, solvable)
         print(solver.parseCheckOutput(self.installList))
+        self.opb_translator = backup ##restore status of translator to keep object consostent
+        return Solution(self.name, installList, uninstallList, solvable)
