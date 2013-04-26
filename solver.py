@@ -164,7 +164,7 @@ class OPBTranslator:
         return retstr
 
     def parseSolverOutput(self, output):
-        """Parse the output of a opb.Solver.
+        """Parse the output of an opb-Solver.
 
         The output of the solver has to be in DIMACS format.
         The output of this method are two lists which indicate
@@ -215,10 +215,8 @@ def parseURL(name):
     linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text, re.IGNORECASE)
     for link, version in linkiter:
         if link.startswith('http'):
-            #linklist.append((link, version))
             yield (link, version)
         else:
-            #linklist.append((REP_URL+name+'/'+link, version))
             yield (REP_URL+name+'/'+link, version)
 
 def downloadPackage(link):
