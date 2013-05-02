@@ -5,7 +5,6 @@ This way you'll have safe calls and won't have to deal with changing
 requirements/names/formats.
 All methods asume you have set the solver and working set accordingly to your
 wishes / configuration.
-Create a DepInstance Object first if you want to work with dependencys and not just check it.
 """
 
 import solver
@@ -52,7 +51,6 @@ class Problem:
     def __init__(self, name, solverprog='./wbo/wbo', solverOptions=['-file-format=opb'], wset=None):
         """Set the parameter for the module which you want to install."""
 
-        solver.loadCache()
         self.solverprog = solverprog
         self.solverOptions = solverOptions
         self.name = name
@@ -61,8 +59,6 @@ class Problem:
 
         self.opb_translator = solver.OPBTranslator(name)
         self.opb_translator.generateMetadata()
-        
-        solver.saveCache()
 
     def solve(self):
         """Solve the Instance. Creates an opb file and inputs it in the solver"""
@@ -104,7 +100,6 @@ class Problem:
         to the list of dependencies.
         """
 
-        solver.loadCache()
         backup = copy.deepcopy(self.opb_translator)
         module = self.opb_translator.name
         version = self.opb_translator.version
@@ -114,7 +109,7 @@ class Problem:
         with open('pydyn.opb', 'w') as f:
             f.write(self.opb_translator.generateOPB(forCheck=True, checkOpts=(module, version)))
         output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
-        solver.saveCache()
+
         installList, uninstallList, solvable = self.opb_translator.parseSolverOutput(output)
         print(solver.parseCheckOutput(self.installList))
         self.opb_translator = backup ##restore status of translator to keep object consostent

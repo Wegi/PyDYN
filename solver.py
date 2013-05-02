@@ -9,6 +9,7 @@ import tarfile
 import sys
 import pickle
 import subprocess
+import json
 
 from pkg_resources import Distribution
 from pkg_resources import Requirement
@@ -25,7 +26,7 @@ class OPBTranslator:
     """An Class to transalte Module-Metadata to OPB and back"""
 
     def __init__(self, name, version=''):
-        self.name = name
+        self.name = name.lower()
         self.version = version
         self.reqdict = dict()
         self.vardict = dict()
@@ -33,6 +34,7 @@ class OPBTranslator:
     def addDependency(self, name, version=''):
         self.name = name
         self.version = version
+####################### new method with meta.tar.gz
 
     def generateMetadata(self):
         """Generates a complete Dictionary of all (recursive) Dependencies of name.
@@ -41,49 +43,38 @@ class OPBTranslator:
         The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly. 
         """
         
-        linklist = parseURL(self.name)
-        newver = newest(list(linklist))
-        temp = downloadPackage(newver[0])
-        self.version = newver[1]
-        if temp:
-            self.reqdict.update({(self.name.lower(), self.version) : getDependencies(temp, self.name.lower(), self.version)})
-            if not self.reqdict: self.reqdict = dict()
-            todo = self.reqdict[(self.name.lower(), newver[1])][:]
-            os.unlink(temp) ## Cleanup
-        else:
-            todo = []
+        metatar = tarfile.open('meta.tar.gz', 'r')
+
+        versionslist = versionsFromMeta(self.name, metatar)
+        newver = newest(versionslist)
+        self.version = newver
+
+        reqs = dependenciesFor(self.name.lower(), self.version, metatar)
+        self.reqdict.update({(self.name.lower(), self.version): reqs})
+        todo = list(reqs)
         strict = dict()
         for i in todo:
             strict.update({i.key: i})  ##Have to be fullfilled at all times
+        
         for req in todo:
-            llist = parseURL(req.key)
-            for linktup in llist:
-                if linktup[1] in req:  ##only use if linktup fullfills requirement
-                    templist = []
-                    if (req.key, linktup[1]) not in CACHE and (req.key, linktup[1]) not in self.reqdict:
-                        #if its a cache miss, fetch the new data
-                        print('---- Cache miss '+req.key+'-'+linktup[1])
-                        ntemp = downloadPackage(linktup[0])
-                        if ntemp:
-                            templist = getDependencies(ntemp, req.key, linktup[1])
-                            for item in templist and item not in todo:
-                                todo.append(item)
-                            os.unlink(ntemp) ## Cleanup
+            vlist = versionsFromMeta(req.key, metatar)
+            for version in vlist:
+                if version in req:  ##only use if linktup fullfills requirement
+                    templist = dependenciesFor(req.key, version, metatar)
+                    for item in templist:
+                        if item not in todo:
+                            todo.append(item)
 
-                    elif (req.key, linktup[1]) in CACHE and (req.key, linktup[1]) not in self.reqdict:
-                        #cache hit take the data from the cache
-                        print('++++ Cache hit '+req.key+'-'+linktup[1])
-                        for item in CACHE[(req.key, linktup[1])]:
-                            if item not in todo:
-                                todo.append(item)
-                        templist = CACHE[(req.key, linktup[1])]
                     #update only if the requirement meets the strict requirements
                     if req.key in strict:
-                        if linktup[1] in strict[req.key]:
-                            self.reqdict.update({(req.key, linktup[1]): templist})
+                        if version in strict[req.key]:
+                            self.reqdict.update({(req.key, version): templist})
                     else:
-                        self.reqdict.update({(req.key, linktup[1]): templist})
-        CACHE.update(self.reqdict)
+                        self.reqdict.update({(req.key, version): templist})
+
+#################################################
+    
+
 
     def generateOPB(self, working_set=working_set, forCheck=False, checkOpts=('', '')):
         """Generate a opb Representation of a requirement-dict.
@@ -201,6 +192,27 @@ class OPBTranslator:
 if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
     urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
 
+def versionsFromMeta(name, tarfile):
+    """yield all versions of name in tarfile"""
+    tarpath = 'meta/'+name+'/'
+    unparsedlist = [f.lower() for f in tarfile.getnames() if f.lower().startswith(tarpath.lower())]
+    for name in unparsedlist:
+        match = re.match(tarpath.lower()+'(.*?).json', name)
+        if match:
+            yield match.group(1)
+
+def dependenciesFor(name, version, tarfile):
+    tarpath = 'meta/'+name+'/'+version+'.json'
+    jsonfile = [f for f in tarfile.getnames() if f.lower() == tarpath.lower()]
+    if jsonfile:
+        data = tarfile.extractfile(jsonfile[0]) #workaround for real name
+        jsondict = json.loads(data.read().decode('utf-8'))
+        for req in jsondict['deplist']:
+            print(name+' '+req)
+            yield Requirement.parse(req)
+    else: yield []
+
+
 def parseURL(name):
     """Provides a linklist for a module.
 
@@ -272,12 +284,12 @@ def getDependencies(paths, name, version):
         return reqlist
 
 def newest(linklist):
-    """Returns the newest module in a linklist."""
+    """Returns the newest module in a list of versions."""
 
-    newest_version = linklist[0]
-    for link, version in linklist:
-        if parse_version(version) > parse_version(newest_version[1]):
-            newest_version = (link, version)
+    newest_version = ''
+    for version in linklist:
+        if parse_version(version) > parse_version(newest_version):
+            newest_version = version
     return newest_version
 
 def installRecommendation(install, uninstall, working_set=working_set):
