@@ -49,9 +49,9 @@ class OPBTranslator:
         newver = newest(versionslist)
         self.version = newver
 
-        reqs = dependenciesFor(self.name.lower(), self.version, metatar)
+        reqs = list(dependenciesFor(self.name.lower(), self.version, metatar))
         self.reqdict.update({(self.name.lower(), self.version): reqs})
-        todo = list(reqs)
+        todo = reqs
         strict = dict()
         for i in todo:
             strict.update({i.key: i})  ##Have to be fullfilled at all times
@@ -60,7 +60,7 @@ class OPBTranslator:
             vlist = versionsFromMeta(req.key, metatar)
             for version in vlist:
                 if version in req:  ##only use if linktup fullfills requirement
-                    templist = dependenciesFor(req.key, version, metatar)
+                    templist = list(dependenciesFor(req.key, version, metatar))
                     for item in templist:
                         if item not in todo:
                             todo.append(item)
@@ -72,6 +72,7 @@ class OPBTranslator:
                     else:
                         self.reqdict.update({(req.key, version): templist})
 
+        print(self.reqdict)  ##DEBUG
 #################################################
     
 
@@ -208,7 +209,6 @@ def dependenciesFor(name, version, tarfile):
         data = tarfile.extractfile(jsonfile[0]) #workaround for real name
         jsondict = json.loads(data.read().decode('utf-8'))
         for req in jsondict['deplist']:
-            print(name+' '+req)
             yield Requirement.parse(req)
     else: yield []
 
