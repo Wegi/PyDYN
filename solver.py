@@ -71,8 +71,6 @@ class OPBTranslator:
                             self.reqdict.update({(req.key, version): templist})
                     else:
                         self.reqdict.update({(req.key, version): templist})
-
-        print(self.reqdict)  ##DEBUG
 #################################################
     
 
