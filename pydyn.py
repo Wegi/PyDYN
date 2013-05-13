@@ -24,7 +24,7 @@ class Solution:
     def getInstallTuples(self):
         """Gives back a list of tuples of which modules to install"""
 
-        list(solver.installRecommendation(self.installList, self.uninstallList, tuples=True))
+        return list(solver.installRecommendation(self.installList, self.uninstallList, tuples=True))
 
 
     def getInstallStrings(self):
