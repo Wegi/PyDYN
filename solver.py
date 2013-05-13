@@ -290,7 +290,7 @@ def newest(linklist):
             newest_version = version
     return newest_version
 
-def installRecommendation(install, uninstall, working_set=working_set):
+def installRecommendation(install, uninstall, working_set=working_set, tuples=False):
     """Human Readable advice on which modules have to be installed on
     current Working Set.
     """
@@ -301,14 +301,21 @@ def installRecommendation(install, uninstall, working_set=working_set):
             if i[0] == p.key and i[1] == p.version:
                 is_in = True
                 break
-        if not is_in: print('~~ Install: '+i[0]+' version '+i[1])
+        if not is_in: 
+            if not tuples:
+                print('~~ Install: '+i[0]+' version '+i[1])
+            else:
+                yield (i[0], i[1])
     for u in uninstall:
         is_in = False
         for p in working_set:
             if u[0] == p.key and u[1] == p.version:
                 is_in = True
                 break
-        if is_in: print('~~ Uninstall: '+u[0]+' version '+u[1])
+        if is_in: 
+            if not tuples:
+                print('~~ Uninstall: '+u[0]+' version '+u[1])
+                
 
 def loadCache(path='pydyn.cache'):
     try:

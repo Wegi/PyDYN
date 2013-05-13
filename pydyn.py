@@ -21,6 +21,11 @@ class Solution:
         self.solvable = solvable
         self.opb_translator = opb_translator
 
+    def getInstallTuples(self):
+        """Gives back a list of tuples of which modules to install"""
+
+        list(solver.installRecommendation(self.installList, self.uninstallList, tuples=True))
+
 
     def getInstallStrings(self):
         """Parses the output of installFor().
