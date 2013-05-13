@@ -1,6 +1,6 @@
 import urllib.request
 import urllib.error
-import patcher
+import pydyn.patcher as  patcher
 import re
 import shutil
 import tempfile
@@ -294,7 +294,7 @@ def installRecommendation(install, uninstall, working_set=working_set, tuples=Fa
     """Human Readable advice on which modules have to be installed on
     current Working Set.
     """
-
+    installList = []
     for i in install:
         is_in = False
         for p in working_set:
@@ -305,7 +305,7 @@ def installRecommendation(install, uninstall, working_set=working_set, tuples=Fa
             if not tuples:
                 print('~~ Install: '+i[0]+' version '+i[1])
             else:
-                yield (i[0], i[1])
+                installList.append((i[0], i[1]))
     for u in uninstall:
         is_in = False
         for p in working_set:
@@ -315,6 +315,7 @@ def installRecommendation(install, uninstall, working_set=working_set, tuples=Fa
         if is_in: 
             if not tuples:
                 print('~~ Uninstall: '+u[0]+' version '+u[1])
+    return installList
                 
 
 def loadCache(path='pydyn.cache'):

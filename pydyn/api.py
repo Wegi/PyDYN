@@ -7,8 +7,8 @@ All methods asume you have set the solver and working set accordingly to your
 wishes / configuration.
 """
 
-import solver
-import depgraph
+import pydyn.solver as solver
+import pydyn.depgraph as depgraph
 import pkg_resources
 import copy
 
@@ -24,7 +24,7 @@ class Solution:
     def getInstallTuples(self):
         """Gives back a list of tuples of which modules to install"""
 
-        return solver.installRecommendation(self.installList, self.uninstallList, tuples=True)
+        return list(solver.installRecommendation(self.installList, self.uninstallList, tuples=True))
 
 
     def getInstallStrings(self):
