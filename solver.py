@@ -193,22 +193,22 @@ if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2]
 
 def versionsFromMeta(name, tarfile):
     """yield all versions of name in tarfile"""
-    tarpath = 'meta/'+name+'/'
-    unparsedlist = [f.lower() for f in tarfile.getnames() if f.lower().startswith(tarpath.lower())]
+    tarpath = ('meta/'+name+'/').lower()
+    unparsedlist = [f for f in tarfile.getnames() if f.startswith(tarpath)]
     for name in unparsedlist:
-        match = re.match(tarpath.lower()+'(.*?).json', name)
+        match = re.match(tarpath+'(.*?).json', name)
         if match:
             yield match.group(1)
 
 def dependenciesFor(name, version, tarfile):
-    tarpath = 'meta/'+name+'/'+version+'.json'
-    jsonfile = [f for f in tarfile.getnames() if f.lower() == tarpath.lower()]
-    if jsonfile:
-        data = tarfile.extractfile(jsonfile[0]) #workaround for real name
+    tarpath = ('meta/'+name+'/'+version+'.json').lower()
+    try:
+        data = tarfile.extractfile(tarpath)
         jsondict = json.loads(data.read().decode('utf-8'))
         for req in jsondict['deplist']:
             yield Requirement.parse(req)
-    else: yield []
+    except KeyError:
+        yield []
 
 
 def parseURL(name):
