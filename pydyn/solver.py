@@ -10,6 +10,7 @@ import sys
 import pickle
 import subprocess
 import json
+import sqlite3
 
 from pkg_resources import Distribution
 from pkg_resources import Requirement
@@ -34,7 +35,7 @@ class OPBTranslator:
     def addDependency(self, name, version=''):
         self.name = name
         self.version = version
-####################### new method with meta.tar.gz
+####################### new method with meta.db
 
     def generateMetadata(self):
         """Generates a complete Dictionary of all (recursive) Dependencies of name.
@@ -43,13 +44,13 @@ class OPBTranslator:
         The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly. 
         """
         
-        metatar = tarfile.open('meta.tar.gz', 'r')
+        metadb = 'meta.db'
 
-        versionslist = versionsFromMeta(self.name, metatar)
+        versionslist = versionsFromMeta(self.name, metadb)
         newver = newest(versionslist)
         self.version = newver
 
-        reqs = list(dependenciesFor(self.name.lower(), self.version, metatar))
+        reqs = list(dependenciesFor(self.name.lower(), self.version, metadb))
         self.reqdict.update({(self.name.lower(), self.version): reqs})
         todo = reqs
         strict = dict()
@@ -57,10 +58,10 @@ class OPBTranslator:
             strict.update({i.key: i})  ##Have to be fullfilled at all times
         
         for req in todo:
-            vlist = versionsFromMeta(req.key, metatar)
+            vlist = versionsFromMeta(req.key, metadb)
             for version in vlist:
                 if version in req:  ##only use if linktup fullfills requirement
-                    templist = list(dependenciesFor(req.key, version, metatar))
+                    templist = list(dependenciesFor(req.key, version, metadb))
                     for item in templist:
                         if item not in todo:
                             todo.append(item)
@@ -191,24 +192,51 @@ class OPBTranslator:
 if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
     urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
 
-def versionsFromMeta(name, tarfile):
+def versionsFromMeta(name, db):
     """yield all versions of name in tarfile"""
-    tarpath = ('meta/'+name+'/').lower()
-    unparsedlist = [f for f in tarfile.getnames() if f.startswith(tarpath)]
-    for name in unparsedlist:
-        match = re.match(tarpath+'(.*?).json', name)
-        if match:
-            yield match.group(1)
+    con = sqlite3.connect(db)
+    with con:
+        cur = con.cursor()
+        data = cur.execute("""select version from meta
+            where name=? COLLATE NOCASE""", (name,))
 
-def dependenciesFor(name, version, tarfile):
-    tarpath = ('meta/'+name+'/'+version+'.json').lower()
-    try:
-        data = tarfile.extractfile(tarpath)
-        jsondict = json.loads(data.read().decode('utf-8'))
-        for req in jsondict['deplist']:
-            yield Requirement.parse(req)
-    except KeyError:
-        yield []
+        for item in data.fetchall():
+            yield item[0]
+
+    #tarpath = ('meta/'+name+'/').lower()
+    #unparsedlist = [f for f in tarfile.getnames() if f.startswith(tarpath)]
+    #for name in unparsedlist:
+    #    match = re.match(tarpath+'(.*?).json', name)
+    #    if match:
+    #        yield match.group(1)
+
+def dependenciesFor(name, version, db):
+    con = sqlite3.connect(db)
+    with con:
+        cur = con.cursor()
+        data = cur.execute("""select requirements from meta
+            where name=? COLLATE NOCASE and
+            version=?""", (name, version))
+        rawreqs = data.fetchone()
+        if rawreqs:
+            rawreqs = rawreqs[0]
+            reqs = rawreqs.split('##')
+            if reqs:
+                reqs = reqs[1:]
+                for req in reqs:
+                    yield Requirement.parse(req)
+        else: yield 
+
+
+
+    #tarpath = ('meta/'+name+'/'+version+'.json').lower()
+    #try:
+    #    data = tarfile.extractfile(tarpath)
+    #    jsondict = json.loads(data.read().decode('utf-8'))
+    #    for req in jsondict['deplist']:
+    #        yield Requirement.parse(req)
+    #except KeyError:
+    #    yield []
 
 
 def parseURL(name):
