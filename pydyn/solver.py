@@ -11,6 +11,7 @@ import pickle
 import subprocess
 import json
 import sqlite3
+import time
 
 from pkg_resources import Distribution
 from pkg_resources import Requirement
@@ -45,12 +46,14 @@ class OPBTranslator:
         """
         
         metadb = 'meta.db'
+        self.elapsedtime = 0
 
         versionslist = versionsFromMeta(self.name, metadb)
         newver = newest(versionslist)
         self.version = newver
-
+        starttime = time.time()
         reqs = list(dependenciesFor(self.name.lower(), self.version, metadb))
+        self.elapsedtime += (time.time()-starttime)
         self.reqdict.update({(self.name.lower(), self.version): reqs})
         todo = reqs
         strict = dict()
@@ -61,7 +64,9 @@ class OPBTranslator:
             vlist = versionsFromMeta(req.key, metadb)
             for version in vlist:
                 if version in req:  ##only use if linktup fullfills requirement
+                    starttime = time.time()
                     templist = list(dependenciesFor(req.key, version, metadb))
+                    self.elapsedtime += (time.time()-starttime)
                     for item in templist:
                         if item not in todo:
                             todo.append(item)
@@ -198,24 +203,17 @@ def versionsFromMeta(name, db):
     with con:
         cur = con.cursor()
         data = cur.execute("""select version from meta
-            where name=? COLLATE NOCASE""", (name,))
+            where name=?""", (name,))
 
         for item in data.fetchall():
             yield item[0]
-
-    #tarpath = ('meta/'+name+'/').lower()
-    #unparsedlist = [f for f in tarfile.getnames() if f.startswith(tarpath)]
-    #for name in unparsedlist:
-    #    match = re.match(tarpath+'(.*?).json', name)
-    #    if match:
-    #        yield match.group(1)
 
 def dependenciesFor(name, version, db):
     con = sqlite3.connect(db)
     with con:
         cur = con.cursor()
         data = cur.execute("""select requirements from meta
-            where name=? COLLATE NOCASE and
+            where name=? and
             version=?""", (name, version))
         rawreqs = data.fetchone()
         if rawreqs:
@@ -225,19 +223,6 @@ def dependenciesFor(name, version, db):
                 reqs = reqs[1:]
                 for req in reqs:
                     yield Requirement.parse(req)
-        else: yield 
-
-
-
-    #tarpath = ('meta/'+name+'/'+version+'.json').lower()
-    #try:
-    #    data = tarfile.extractfile(tarpath)
-    #    jsondict = json.loads(data.read().decode('utf-8'))
-    #    for req in jsondict['deplist']:
-    #        yield Requirement.parse(req)
-    #except KeyError:
-    #    yield []
-
 
 def parseURL(name):
     """Provides a linklist for a module.
