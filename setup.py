@@ -14,7 +14,7 @@ CLASSIFIER = [
 
 setup(
     name='PyDYN',
-    version='0.1',
+    version='0.2',
     author='Alexander Schneider',
     author_email='alexander.schneider@hhu.de',
     packages=['pydyn'],
