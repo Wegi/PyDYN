@@ -36,6 +36,8 @@ class OPBTranslator:
     def addDependency(self, name, version=''):
         self.name = name
         self.version = version
+
+###############################################
 ####################### new method with meta.db
 
     def generateMetadata(self):
@@ -45,15 +47,12 @@ class OPBTranslator:
         The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly. 
         """
         
-        metadb = 'meta.db'
-        self.elapsedtime = 0
+        data = json.loads(open('meta.json', 'r').read())
 
-        versionslist = versionsFromMeta(self.name, metadb)
+        versionslist = versionsFromMeta(self.name, data)
         newver = newest(versionslist)
         self.version = newver
-        starttime = time.time()
-        reqs = list(dependenciesFor(self.name.lower(), self.version, metadb))
-        self.elapsedtime += (time.time()-starttime)
+        reqs = list(dependenciesFor(self.name.lower(), self.version, data))
         self.reqdict.update({(self.name.lower(), self.version): reqs})
         todo = reqs
         strict = dict()
@@ -61,12 +60,10 @@ class OPBTranslator:
             strict.update({i.key: i})  ##Have to be fullfilled at all times
         
         for req in todo:
-            vlist = versionsFromMeta(req.key, metadb)
+            vlist = versionsFromMeta(req.key, data)
             for version in vlist:
                 if version in req:  ##only use if linktup fullfills requirement
-                    starttime = time.time()
-                    templist = list(dependenciesFor(req.key, version, metadb))
-                    self.elapsedtime += (time.time()-starttime)
+                    templist = list(dependenciesFor(req.key, version, data))
                     for item in templist:
                         if item not in todo:
                             todo.append(item)
@@ -197,32 +194,14 @@ class OPBTranslator:
 if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
     urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
 
-def versionsFromMeta(name, db):
-    """yield all versions of name in tarfile"""
-    con = sqlite3.connect(db)
-    with con:
-        cur = con.cursor()
-        data = cur.execute("""select version from meta
-            where name=?""", (name,))
+def versionsFromMeta(name, data):
+    if name in data:
+        for version in data[name].keys():
+            yield version
 
-        for item in data.fetchall():
-            yield item[0]
-
-def dependenciesFor(name, version, db):
-    con = sqlite3.connect(db)
-    with con:
-        cur = con.cursor()
-        data = cur.execute("""select requirements from meta
-            where name=? and
-            version=?""", (name, version))
-        rawreqs = data.fetchone()
-        if rawreqs:
-            rawreqs = rawreqs[0]
-            reqs = rawreqs.split('##')
-            if reqs:
-                reqs = reqs[1:]
-                for req in reqs:
-                    yield Requirement.parse(req)
+def dependenciesFor(name, version, data):
+    for item in data[name][version]:
+        yield Requirement.parse(item)
 
 def parseURL(name):
     """Provides a linklist for a module.

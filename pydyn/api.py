@@ -62,11 +62,8 @@ class Problem:
         self.name = name
         if wset: self.wset = wset
         else: self.wset = pkg_resources.working_set
-        start = time.time()
         self.opb_translator = solver.OPBTranslator(name)
         self.opb_translator.generateMetadata()
-        print('whole time: '+str(time.time()-start))
-        print('database-time: '+str(self.opb_translator.elapsedtime))
 
     def solve(self):
         """Solve the Instance. Creates an opb file and inputs it in the solver"""
