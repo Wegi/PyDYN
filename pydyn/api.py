@@ -76,7 +76,7 @@ class Problem:
     def setSolver(self, solverprog, solverOptions=[]):
         """Set the opb-solver to use. (standard is minisat+)
 
-        The Solver has to accept the opb Format and generate 
+        The Solver has to accept the opb Format and generate
         his output according to DIMACS regulations as of 2013.
         """
 
@@ -86,7 +86,7 @@ class Problem:
     def setWorkingSet(self, paths):
         """Set the Working Set to paths.
 
-        The Working Set is the active module path where your modules for a 
+        The Working Set is the active module path where your modules for a
         project reside.
         paths has to be a list of paths.
         """
@@ -95,7 +95,7 @@ class Problem:
     def setDefaultWorkingSet(self):
         """Set the Working Set back to default (sys.path).
 
-        The Working Set is the active module path where your modules for a 
+        The Working Set is the active module path where your modules for a
         project reside.
         """
         self.wset = pkg_resources.working_set

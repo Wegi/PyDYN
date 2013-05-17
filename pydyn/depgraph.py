@@ -7,7 +7,7 @@ from subprocess import check_call
 def getGraph(paths=None):
     """Gives you a Dictionary of all the Dependencys.
 
-    The key is the name of the module wich has the dependency (could be 0 
+    The key is the name of the module wich has the dependency (could be 0
     dependencies) and the value is a List of names of Distributions the key depends on.
 
     If the paths argument is None its uses the default path.

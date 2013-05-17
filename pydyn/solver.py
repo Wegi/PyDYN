@@ -38,13 +38,13 @@ class OPBTranslator:
         self.version = version
 
 ###############################################
-####################### new method with meta.db
+####################### new method with meta.json
 
     def generateMetadata(self):
         """Generates a complete Dictionary of all (recursive) Dependencies of name.
 
         Returns a dictionary of the format {(name, version): [Requirement]}
-        The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly. 
+        The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly.
         """
         
         data = json.loads(open('meta.json', 'r').read())
