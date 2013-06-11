@@ -1,4 +1,5 @@
 from distutils.core import setup
+import yolonese
 
 CLASSIFIER = [
     "Development Status :: 4 - Beta",

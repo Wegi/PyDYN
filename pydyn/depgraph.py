@@ -4,11 +4,13 @@ import argparse
 
 from subprocess import check_call
 
+
 def getGraph(paths=None):
     """Gives you a Dictionary of all the Dependencys.
 
     The key is the name of the module wich has the dependency (could be 0
-    dependencies) and the value is a List of names of Distributions the key depends on.
+    dependencies) and the value is a List of names of Distributions the key
+    depends on.
 
     If the paths argument is None its uses the default path.
     paths must be iterable.
@@ -20,17 +22,19 @@ def getGraph(paths=None):
     versions = dict()
     for p in wset:
         versions.update({p.key: p.version})
-    graph = dict([((p.key, p.version), [(n.key, versions[n.key]) for n in p.requires()]) for p in wset])
+    graph = dict([((p.key, p.version), [(n.key, versions[n.key]) for n in
+                                        p.requires()]) for p in wset])
     return graph
+
 
 def graphToDot(graph, output="output.dot", show_disconnected=True):
     """Ouputs the graph in the dot format.
 
     The format of graph has to be like the one getGraph() returns.
     output is the output-file.
-    if show_disconnected is True it shows Distributions without dependencies as well.
+    if show_disconnected is True it shows Distributions without dependencies
+    as well.
     """
-    ##TODO Optimize layout
     wset = pkg_resources.working_set
     with open(output, 'w') as f:
         f.write('digraph DependencyGraph {\n')
@@ -41,6 +45,7 @@ def graphToDot(graph, output="output.dot", show_disconnected=True):
                 f.write('"'+dist[0]+'-'+dist[1]+'" -> "'+d[0]+'-'+d[1]+'"\n')
         f.write('}')
 
+
 def graphToPNG(graph, output="output.png", show_disconnected=True):
     """Output a graph as PNG.
 
@@ -48,7 +53,8 @@ def graphToPNG(graph, output="output.png", show_disconnected=True):
     This method will create/overwrite a .dot file too.
     The format of graph has to be like the one getGraph() returns.
     output is the output-file.
-    if show_disconnected is True it shows Distributions without dependencies as well.
+    if show_disconnected is True it shows Distributions without dependencies
+    as well.
     """
 
     dotout = os.path.splitext(output)[0]+'.dot'
@@ -56,7 +62,9 @@ def graphToPNG(graph, output="output.png", show_disconnected=True):
     try:
         check_call(['dot', '-Tpng', dotout, '-o', output])
     except CalledProcessError:
-        print('Error: An error ocurred during conversion to PNG. Make sure you have graphviz installed')
+        print('Error: An error ocurred during conversion to PNG. Make sure'
+              'you have graphviz installed')
+
 
 def graphToSVG(graph, output="output.svg", show_disconnected=True):
     """Output a graph as PNG.
@@ -65,22 +73,26 @@ def graphToSVG(graph, output="output.svg", show_disconnected=True):
     This method will create/overwrite a .dot file too.
     The format of graph has to be like the one getGraph() returns.
     output is the output-file.
-    if show_disconnected is True it shows Distributions without dependencies as well.
+    if show_disconnected is True it shows Distributions without dependencies
+    as well.
     """
-    
+
     dotout = os.path.splitext(output)[0]+'.dot'
     graphToDot(graph, dotout, show_disconnected)
     try:
         check_call(['dot', '-Tsvg', dotout, '-o', output])
     except CalledProcessError:
-        print('Error: An error ocurred during conversion to PNG. Make sure you have graphviz installed')    
+        print('Error: An error ocurred during conversion to PNG. Make sure'
+              'you have graphviz installed')
+
 
 def graphToTerminal(graph, show_disconnected=True):
     """Output a graph as a Text Representation on the Terminal.
 
     The format of graph has to be like the one getGraph() returns.
     output is the output-file.
-    if show_disconnected is True it shows Distributions without dependencies as well.
+    if show_disconnected is True it shows Distributions without dependencies
+    as well.
     """
 
     for dist, deplist in graph.items():
@@ -88,6 +100,7 @@ def graphToTerminal(graph, show_disconnected=True):
             print('"'+dist+'"')
         for d in deplist:
             print('"'+dist+'" -> "'+d+'"')
+
 
 if __name__ == "__main__":
     # Ugly Ugly Function, i'm sorry

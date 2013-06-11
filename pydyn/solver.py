@@ -1,6 +1,6 @@
 import urllib.request
 import urllib.error
-import pydyn.patcher as  patcher
+import pydyn.patcher as patcher
 import re
 import shutil
 import tempfile
@@ -21,8 +21,9 @@ from pkg_resources import working_set
 REP_URL = 'https://pypi.python.org/simple/'
 REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
-FAKEWEIGHT = '+9001'  ##fake metamodule
+FAKEWEIGHT = '+9001'  # fake metamodule
 CACHE = dict()
+
 
 class OPBTranslator:
     """An Class to transalte Module-Metadata to OPB and back"""
@@ -37,16 +38,14 @@ class OPBTranslator:
         self.name = name
         self.version = version
 
-###############################################
-####################### new method with meta.json
-
     def generateMetadata(self):
-        """Generates a complete Dictionary of all (recursive) Dependencies of name.
+        """Generates a complete Dictionary of all (recursive)
+        Dependencies of name.
 
         Returns a dictionary of the format {(name, version): [Requirement]}
-        The translator makes some assumptions, i.e. all dependencys of "name" have to be fulfilled strictly.
+        The translator makes some assumptions, i.e. all dependencys of "name"
+        have to be fulfilled strictly.
         """
-        
         data = json.loads(open('meta.json', 'r').read())
 
         versionslist = versionsFromMeta(self.name, data)
@@ -57,28 +56,26 @@ class OPBTranslator:
         todo = reqs
         strict = dict()
         for i in todo:
-            strict.update({i.key: i})  ##Have to be fullfilled at all times
-        
+            strict.update({i.key: i})  # Have to be fullfilled at all times
+
         for req in todo:
             vlist = versionsFromMeta(req.key, data)
             for version in vlist:
-                if version in req:  ##only use if linktup fullfills requirement
+                if version in req:  # only use if linktup fullfills requirement
                     templist = list(dependenciesFor(req.key, version, data))
                     for item in templist:
                         if item not in todo:
                             todo.append(item)
 
-                    #update only if the requirement meets the strict requirements
+                    # update only if the requirement meets the strict requirements
                     if req.key in strict:
                         if version in strict[req.key]:
                             self.reqdict.update({(req.key, version): templist})
                     else:
                         self.reqdict.update({(req.key, version): templist})
-#################################################
-    
 
-
-    def generateOPB(self, working_set=working_set, forCheck=False, checkOpts=('', '')):
+    def generateOPB(self, working_set=working_set, forCheck=False,
+                    checkOpts=('', '')):
         """Generate a opb Representation of a requirement-dict.
 
         The Requirement-dictionary gets parsed and a opb Instance of the
@@ -86,13 +83,16 @@ class OPBTranslator:
         should be parsable by all PBO-Solver, who comply to the
         DIMACS Format.
 
-        forCheck has to be True only if yo use this method from checkFutureDependency() in the api.
-        checkOpts is a tuple that holds name and version of the module to which you add dependencies.
+        forCheck has to be True only if yo use this method from
+        checkFutureDependency() in the api.
+        checkOpts is a tuple that holds name and version of the module
+        to which you add dependencies.
         """
 
         retstr = ''
         minstring = 'min: '
-        fakenames = set() ##dictionary for fakepackages
+        connumber = 0
+        fakenames = set()  # dictionary for fakepackages
         conflicts = set()
         symtable = dict()
         symcounter = 1
@@ -115,11 +115,13 @@ class OPBTranslator:
                 minstring += FAKEWEIGHT+' x'+str(symcounter)+' '
                 symcounter += 1
         minstring += ';\n'
-        retstr += minstring # minimization function
-        retstr += '+1 '+symtable[(self.name.lower(), self.version)]+' >= 1;\n' # module you want to install
+        retstr += minstring  # minimization function
+        retstr += '+1 '+symtable[(self.name.lower(), self.version)]+' >= 1;\n'
+        # module you want to install
+        connumber += 1
         if forCheck:
             retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
-
+            connumber += 1
         for key, val in symtable.items():
             confstr = ''
             templist = []
@@ -132,9 +134,10 @@ class OPBTranslator:
         for item in conflicts:
             newset = set(item)
             for var in newset:
-                confstr += '+1 '+var+' '
-            confstr += '<= 1;\n'
-        retstr += confstr  #conflicts
+                confstr += '-1 '+var+' '
+            confstr += '>= -1;\n'
+            connumber += 1
+        retstr += confstr  # conflicts
 
         # update reqdict with working_set
         if not forCheck:
@@ -151,9 +154,12 @@ class OPBTranslator:
                 if forCheck:
                     depstr += '+1 '+symtable[(req.key, '0.0-fake')]+' '
                 depstr += '>= 0;\n'
-                if switch: retstr += depstr # dependencies
+                connumber += 1
+                if switch:
+                    retstr += depstr  # dependencies
         for key, val in symtable.items():
             self.vardict.update({val: key})
+        retstr = "* #variable= "+str(len(symtable))+" #constraint= "+str(connumber)+"\n"+retstr
         return retstr
 
     def parseSolverOutput(self, output):
@@ -175,7 +181,7 @@ class OPBTranslator:
         variables = exp.group(0).split()
         install = [self.vardict[var] for var in variables if var.startswith('x')]
         uninstall = [self.vardict[var[1:]] for var in variables if var.startswith('-')]
-        return install, uninstall, solvable 
+        return install, uninstall, solvable
 
     def getFutureState(self, inst):
         """Give back a graph for drawing methods."""
@@ -192,21 +198,24 @@ class OPBTranslator:
         return graph
 
 if sys.version_info[0] == 3 and sys.version_info[1] == 2 and sys.version_info[2] < 3:
-    urllib.request = patcher ##module bugged in 3.2.0 to 3.2.2
+    urllib.request = patcher  # module bugged in 3.2.0 to 3.2.2
+
 
 def versionsFromMeta(name, data):
     if name in data:
         for version in data[name].keys():
             yield version
 
+
 def dependenciesFor(name, version, data):
     for item in data[name][version]:
         yield Requirement.parse(item)
 
+
 def parseURL(name):
     """Provides a linklist for a module.
 
-    name has to be the name of a module hosted on PyPi. 
+    name has to be the name of a module hosted on PyPi.
     This function parses all links on PyPi for this module and returns
     a list of tuples (link to module as .tar.gz, version).
     """
@@ -214,12 +223,14 @@ def parseURL(name):
     resp = urllib.request.urlopen(REP_URL+name+'/')
     data = resp.read()
     text = data.decode('utf-8')
-    linkiter = re.findall(r"<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\""%name, text, re.IGNORECASE)
+    rx = r'<a href=\"([\.\.|https?].*?packages.*/.*%s-(.*)\.tar\.gz.*?)\"' % name
+    linkiter = re.findall(rx, text, re.IGNORECASE)
     for link, version in linkiter:
         if link.startswith('http'):
             yield (link, version)
         else:
             yield (REP_URL+name+'/'+link, version)
+
 
 def downloadPackage(link):
     """Downloads a module.
@@ -238,6 +249,7 @@ def downloadPackage(link):
         temp.name = None
     print('#### finished download')
     return temp.name
+
 
 def getDependencies(paths, name, version):
     """Parses Dependencies from setup.py of tarred module.
@@ -273,6 +285,7 @@ def getDependencies(paths, name, version):
             f.close()
         return reqlist
 
+
 def newest(linklist):
     """Returns the newest module in a list of versions."""
 
@@ -281,6 +294,7 @@ def newest(linklist):
         if parse_version(version) > parse_version(newest_version):
             newest_version = version
     return newest_version
+
 
 def installRecommendation(install, uninstall, working_set=working_set, tuples=False):
     """Human Readable advice on which modules have to be installed on
@@ -293,7 +307,7 @@ def installRecommendation(install, uninstall, working_set=working_set, tuples=Fa
             if i[0] == p.key and i[1] == p.version:
                 is_in = True
                 break
-        if not is_in: 
+        if not is_in:
             if not tuples:
                 print('~~ Install: '+i[0]+' version '+i[1])
             else:
@@ -304,18 +318,19 @@ def installRecommendation(install, uninstall, working_set=working_set, tuples=Fa
             if u[0] == p.key and u[1] == p.version:
                 is_in = True
                 break
-        if is_in: 
+        if is_in:
             if not tuples:
                 print('~~ Uninstall: '+u[0]+' version '+u[1])
     return installList
-                
+
 
 def loadCache(path='pydyn.cache'):
     try:
-        global CACHE 
+        global CACHE
         CACHE = pickle.load(open(path, 'rb'))
     except IOError:
         print('Warning: Could not load Cache')
+
 
 def saveCache(path='pydyn.cache'):
     try:
@@ -323,6 +338,7 @@ def saveCache(path='pydyn.cache'):
         print('Dumping cache')
     except IOError:
         print('Warning: Could not save Cache')
+
 
 def parseCheckOutput(install):
     """Parses the preparsed solver output with respect to fakevariables"""
@@ -333,13 +349,14 @@ def parseCheckOutput(install):
     for item in install:
         if item[1] != '0.0-fake':
             retstr += item[0]+' version '+item[1]+'\n'
-        else: 
+        else:
             consistent = False
             inconStr += item[0]+'\n'
     if not consistent:
         retstr += '### WARNING: The dependencies can only be kept consistent without the following packages:\n'
         retstr += inconStr
     return retstr
+
 
 def callSolver(inputfile, solver='./wbo/wbo', options=[]):
     """Call a solver with an opb instance.

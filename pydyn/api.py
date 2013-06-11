@@ -13,9 +13,11 @@ import pkg_resources
 import copy
 import time
 
+
 class Solution:
 
-    def __init__(self, name, installList, uninstallList, solvable, opb_translator):
+    def __init__(self, name, installList, uninstallList, solvable,
+                 opb_translator):
         self.name = name
         self.installList = installList
         self.uninstallList = uninstallList
@@ -25,8 +27,8 @@ class Solution:
     def getInstallTuples(self):
         """Gives back a list of tuples of which modules to install"""
 
-        return list(solver.installRecommendation(self.installList, self.uninstallList, tuples=True))
-
+        return list(solver.installRecommendation(self.installList,
+                    self.uninstallList, tuples=True))
 
     def getInstallStrings(self):
         """Parses the output of installFor().
@@ -36,42 +38,53 @@ class Solution:
         solver.installRecommendation(self.installList, self.uninstallList)
 
     def drawPNG(self):
-        """Output a .png file with the dependency graph after parsed module would be installed.
+        """Output a .png file with the dependency graph after parsed module
+        would be installed.
 
-        A module should have been parsed with installFor() before calling this function
+        A module should have been parsed with installFor() before calling this
+        function.
         """
         graph = self.opb_translator.getFutureState(self.installList)
         depgraph.graphToPNG(graph)
 
     def drawSVG(self):
-        """Output a .svg file with the dependency graph after parsed module would be installed.
+        """Output a .svg file with the dependency graph after parsed module
+        would be installed.
 
-        A module should have been parsed with installFor() before calling this function
+        A module should have been parsed with installFor() before calling this
+        function.
         graphviz package has to be installed on UNIX Systems.
         """
         graph = self.opb_translator.getFutureState(self.installList)
         depgraph.graphToSVG(graph)
 
+
 class Problem:
 
-    def __init__(self, name, solverprog='./wbo/wbo', solverOptions=['-file-format=opb'], wset=None):
+    def __init__(self, name, solverprog='./wbo/wbo',
+                 solverOptions=['-file-format=opb'], wset=None):
         """Set the parameter for the module which you want to install."""
 
         self.solverprog = solverprog
         self.solverOptions = solverOptions
         self.name = name
-        if wset: self.wset = wset
-        else: self.wset = pkg_resources.working_set
+        if wset:
+            self.wset = wset
+        else:
+            self.wset = pkg_resources.working_set
         self.opb_translator = solver.OPBTranslator(name)
         self.opb_translator.generateMetadata()
 
     def solve(self):
-        """Solve the Instance. Creates an opb file and inputs it in the solver"""
+        """Solve the Instance. Creates an opb file and inputs it in the solver
+        """
         with open('pydyn.opb', 'w') as f:
             f.write(self.opb_translator.generateOPB(working_set=self.wset))
-        output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
+        output = solver.callSolver('pydyn.opb', solver=self.solverprog,
+                                   options=self.solverOptions)
         installList, uninstallList, solvable = self.opb_translator.parseSolverOutput(output)
-        return Solution(self.name, installList, uninstallList, solvable, self.opb_translator)
+        return Solution(self.name, installList, uninstallList, solvable,
+                        self.opb_translator)
 
     def setSolver(self, solverprog, solverOptions=[]):
         """Set the opb-solver to use. (standard is minisat+)
@@ -112,10 +125,13 @@ class Problem:
         self.opb_translator.generateMetadata()
 
         with open('pydyn.opb', 'w') as f:
-            f.write(self.opb_translator.generateOPB(forCheck=True, checkOpts=(module, version)))
-        output = solver.callSolver('pydyn.opb', solver=self.solverprog, options=self.solverOptions)
+            f.write(self.opb_translator.generateOPB(
+                    forCheck=True, checkOpts=(module, version)))
+        output = solver.callSolver('pydyn.opb', solver=self.solverprog,
+                                   options=self.solverOptions)
 
         installList, uninstallList, solvable = self.opb_translator.parseSolverOutput(output)
         print(solver.parseCheckOutput(self.installList))
-        self.opb_translator = backup ##restore status of translator to keep object consostent
+        self.opb_translator = backup
+        # restore status of translator to keep object consostent
         return Solution(self.name, installList, uninstallList, solvable)
