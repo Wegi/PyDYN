@@ -91,7 +91,6 @@ class OPBTranslator:
 
         retstr = ''
         minstring = 'min: '
-        connumber = 0
         fakenames = set()  # dictionary for fakepackages
         conflicts = set()
         symtable = dict()
@@ -118,7 +117,6 @@ class OPBTranslator:
         retstr += minstring  # minimization function
         retstr += '+1 '+symtable[(self.name.lower(), self.version)]+' >= 1;\n'
         # module you want to install
-        connumber += 1
         if forCheck:
             retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
             connumber += 1
@@ -136,7 +134,6 @@ class OPBTranslator:
             for var in newset:
                 confstr += '-1 '+var+' '
             confstr += '>= -1;\n'
-            connumber += 1
         retstr += confstr  # conflicts
 
         # update reqdict with working_set
@@ -154,11 +151,11 @@ class OPBTranslator:
                 if forCheck:
                     depstr += '+1 '+symtable[(req.key, '0.0-fake')]+' '
                 depstr += '>= 0;\n'
-                connumber += 1
                 if switch:
                     retstr += depstr  # dependencies
         for key, val in symtable.items():
             self.vardict.update({val: key})
+        connumber = len(retstr.splitlines())-1
         retstr = "* #variable= "+str(len(symtable))+" #constraint= "+str(connumber)+"\n"+retstr
         return retstr
 
@@ -172,13 +169,17 @@ class OPBTranslator:
 
         exp = re.search(r'^v .*$', output, flags=re.MULTILINE)
         solvablestr = re.search(r'^s.*', output, flags=re.MULTILINE)
-        temp = solvablestr.group(0).split()
         solvable = False
-        if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
-            solvable = True
-        elif temp[1] == 'UNSATISFIABLE':
-            solvable = False
-        variables = exp.group(0).split()
+        if solvablestr:
+            temp = solvablestr.group(0).split()
+            if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
+                solvable = True
+            elif temp[1] == 'UNSATISFIABLE':
+                solvable = False
+        if exp:
+            variables = exp.group(0).split()
+        else:
+            variables = ''
         install = [self.vardict[var] for var in variables if var.startswith('x')]
         uninstall = [self.vardict[var[1:]] for var in variables if var.startswith('-')]
         return install, uninstall, solvable
@@ -208,8 +209,9 @@ def versionsFromMeta(name, data):
 
 
 def dependenciesFor(name, version, data):
-    for item in data[name][version]:
-        yield Requirement.parse(item)
+    if name in data and version in data[name]:
+        for item in data[name][version]:
+            yield Requirement.parse(item)
 
 
 def parseURL(name):
@@ -366,4 +368,4 @@ def callSolver(inputfile, solver='./wbo/wbo', options=[]):
     optionstr = ' '
     for i in options:
         optionstr += i+' '
-    return subprocess.getoutput(solver+optionstr+inputfile)
+    return subprocess.getoutput(solver+' '+inputfile+optionstr)
