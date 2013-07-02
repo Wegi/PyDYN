@@ -33,7 +33,8 @@ solverlist = OrderedDict([('./wbo', ['-file-format=opb']),
                           ('java -jar sat4j-pb.jar', []),
                           ('./pb2sat+zchaff', [])])
 
-modulelist = ['adhocracy', 'lxml', 'distribute', 'boto', 'zc.buildout', 'pip',
+#unsolvable for minisat: adhocracy, 'deliverance' , 'tiddlywebplugins.tiddlyspace', 'sentry'
+modulelist = ['lxml', 'distribute', 'boto', 'zc.buildout', 'pip',
               'simplejson', 'setuptools', 'requests', 'django', 'paste',
               'Jinja2', 'virtualenv', 'nose', 'PasteDeploy', 'psycopg2',
               'python-dateutil', 'sqlalchemy', 'coverage', 'pycrypto',
@@ -43,10 +44,10 @@ modulelist = ['adhocracy', 'lxml', 'distribute', 'boto', 'zc.buildout', 'pip',
               'six', 'pygments', 'meld3', 'graphite-web', 'webob', 'mako',
               'setuptools-git', 'supervisor', 'carbon', 'selenium', 'suds',
               'MarkupSafe', 'zc.recipe.egg', 'msgpack-python', 'redis',
-              'minitage.paste', 'gevent', 'amqplib', 'deliverance',
+              'minitage.paste', 'gevent', 'amqplib',
               'logilab-common', 'logilab-astng', 'versiontools', 'beautifulsoup',
-              'pylint', 'eggtestinfo', 'termcolor', 'tiddlywebplugins.tiddlyspace',
-              'pep8', 'unittest2', 'billiard', 'docutils', 'sentry', 'beaker',
+              'pylint', 'eggtestinfo', 'termcolor',
+              'pep8', 'unittest2', 'billiard', 'docutils', 'beaker',
               'mock', 'ssh', 'django-celery', 'sphinx', 'decorator',
               'django-debug-toolbar', 'twisted', 'ordereddict', 'raven',
               'vnc2flv', 'numpy', 'Formencode', 'py', 'markdown', 'pyyaml',
@@ -103,7 +104,7 @@ if __name__ == '__main__':
             print('processing: '+module+' with '+solver)
             problem = api.Problem(module, solverprog=solver, solverOptions=opts)
             res = timeout(problem.solve, timeout_duration=10)
-            print('returning from '+module+' with '+solver)
+            print('returning from'+module+' with '+solver)
             if res:
                 if res[2]:  # solvable
                     solveddata[solver][0] += 1

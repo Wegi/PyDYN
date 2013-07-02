@@ -75,7 +75,7 @@ class OPBTranslator:
                         self.reqdict.update({(req.key, version): templist})
 
     def generateOPB(self, working_set=working_set, forCheck=False,
-                    checkOpts=('', '')):
+                    checkOpts=('', ''), solvertest=False):
         """Generate a opb Representation of a requirement-dict.
 
         The Requirement-dictionary gets parsed and a opb Instance of the
@@ -117,9 +117,12 @@ class OPBTranslator:
         retstr += minstring  # minimization function
         retstr += '+1 '+symtable[(self.name.lower(), self.version)]+' >= 1;\n'
         # module you want to install
-        if forCheck:
-            retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
-            connumber += 1
+        if forCheck or solvertest:
+            if isinstance(checkOpts, tuple):
+                retstr += '+1 '+symtable[(checkOpts[0].lower(), checkOpts[1])]+' >= 1;\n'
+            else:
+                for item in checkOpts:
+                    retstr += '+1 '+symtable[(item[0].lower(), item[1])]+' >= 1;\n'
         for key, val in symtable.items():
             confstr = ''
             templist = []
@@ -172,7 +175,7 @@ class OPBTranslator:
         solvable = False
         if solvablestr:
             temp = solvablestr.group(0).split()
-            if temp[1] == 'OPTIMUM' and temp[2] == 'FOUND':
+            if (temp[1] == 'OPTIMUM' and temp[2] == 'FOUND') or temp[1] == 'SATISFIABLE':
                 solvable = True
             elif temp[1] == 'UNSATISFIABLE':
                 solvable = False
