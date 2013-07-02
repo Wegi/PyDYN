@@ -3,6 +3,7 @@ import os.path
 import argparse
 
 from subprocess import check_call
+from subprocess import CalledProcessError
 
 
 def getGraph(paths=None):
@@ -35,7 +36,6 @@ def graphToDot(graph, output="output.dot", show_disconnected=True):
     if show_disconnected is True it shows Distributions without dependencies
     as well.
     """
-    wset = pkg_resources.working_set
     with open(output, 'w') as f:
         f.write('digraph DependencyGraph {\n')
         for dist, deplist in graph.items():

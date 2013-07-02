@@ -4,16 +4,12 @@ import pydyn.patcher as patcher
 import re
 import shutil
 import tempfile
-import os
 import tarfile
 import sys
 import pickle
 import subprocess
 import json
-import sqlite3
-import time
 
-from pkg_resources import Distribution
 from pkg_resources import Requirement
 from pkg_resources import parse_version
 from pkg_resources import working_set

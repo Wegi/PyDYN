@@ -11,7 +11,6 @@ import pydyn.solver as solver
 import pydyn.depgraph as depgraph
 import pkg_resources
 import copy
-import time
 
 
 class Solution:
