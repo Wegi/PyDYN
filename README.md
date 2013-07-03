@@ -3,25 +3,29 @@ PyDYN
 
 A proof of concept for a better python dependency management
 
-_Dependencies:_
-*PBO format compatible solver 
-*distribute OR setuptools installed on System
-*meta.json in executing dir
+__Dependencies:__
+
+* PBO format compatible solver 
+* distribute OR setuptools installed on System
+* meta.json in executing dir
 
 
-_How to Use:_
+__How to Use:__
+
 1. Make sure the dir from which PyDYN is executed contains the meta.json file.
 2. import pydyn.api - the other modules should no be used independently.
 3. Instanciate an object from the pydyn.api.Problem class. 
-    3.1 The only needed parameter is the package name for which you want to calculate the dependencies. 
-    3.2 The solver argument if unchanged looks for the wbo solver (in the ./wbo/ dir). 
-    3.3 If you change it, use the same syntax you would use in the shell to execute the solver. (without options)
-    3.4 If you change the solver argument, don't forget to change SolverOptions as well.
-    3.5 SolverOptions is a list of comandline options for the solver. If you don't have any use an empty list. ([])
+    3.1. The only needed parameter is the package name for which you want to calculate the dependencies. 
+    3.2. The solver argument if unchanged looks for the wbo solver (in the ./wbo/ dir). 
+    3.3. If you change it, use the same syntax you would use in the shell to execute the solver. (without options)
+    3.4. If you change the solver argument, don't forget to change SolverOptions as well.
+    3.5. SolverOptions is a list of comandline options for the solver. If you don't have any use an empty list. ([])
 4. The Problem object has a solve() method which returns a pydyn.api.Solution object.
 5. The Solution object has several methods to output the solution to the dependencie resolution problem.
 
-_Licence_
+
+__Licence:__
+
 The MIT License (MIT)
 
 Copyright (c) 2013 Alexander Schneider
