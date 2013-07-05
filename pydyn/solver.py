@@ -15,6 +15,7 @@ from pkg_resources import parse_version
 from pkg_resources import working_set
 
 REP_URL = 'https://pypi.python.org/simple/'
+META_URL = 'http://www.red-dove.com/pypi/projects/'
 REMWEIGHT = '-100'
 NEWWEIGHT = '+20'
 FAKEWEIGHT = '+9001'  # fake metamodule
@@ -251,40 +252,45 @@ def downloadPackage(link):
     print('#### finished download')
     return temp.name
 
+# =========== Deprecated ===============
+# def getDependencies(paths, name, version):
+#     """Parses Dependencies from setup.py of tarred module.
 
-def getDependencies(paths, name, version):
-    """Parses Dependencies from setup.py of tarred module.
+#     paths is the path to the module as .tar.gz. name and version
+#     are the name and version of the module, that has to be parsed.
+#     Parses only if the install_requires String lists all the dependencies.
+#     Returns a List of [Requirement] objects.
+#     """
 
-    paths is the path to the module as .tar.gz. name and version
-    are the name and version of the module, that has to be parsed.
-    Parses only if the install_requires String lists all the dependencies.
-    Returns a List of [Requirement] objects.
-    """
+#     try:
+#         tarball = tarfile.open(paths, mode='r')
+#     except tarfile.ReadError:
+#         print('Error: Not a tarfile, ignore it')
+#     else:
+#         try:
+#             setupfile = tarball.getmember(tarball.next().name+'/setup.py')
+#         except KeyError:
+#             print('Error: No setup.py in tarball')
+#         else:
+#             f = tarball.extractfile(setupfile)
+#             content = f.read().decode('utf-8')
+#             rawstring = re.findall(r'install_requires=\[(.*?)\]', content, flags=re.DOTALL)
 
-    try:
-        tarball = tarfile.open(paths, mode='r')
-    except tarfile.ReadError:
-        print('Error: Not a tarfile, ignore it')
-    else:
-        try:
-            setupfile = tarball.getmember(tarball.next().name+'/setup.py')
-        except KeyError:
-            print('Error: No setup.py in tarball')
-        else:
-            f = tarball.extractfile(setupfile)
-            content = f.read().decode('utf-8')
-            rawstring = re.findall(r'install_requires=\[(.*?)\]', content, flags=re.DOTALL)
+#             if rawstring:
+#                 deplist = re.findall(r'"(.*?)"', rawstring[0])
+#                 deplist.extend(re.findall(r"'(.*?)'", rawstring[0]))
+#             else:
+#                 deplist = []
+#             reqlist = []
+#             for req in deplist:
+#                 reqlist.append(Requirement.parse(req))
+#             f.close()
+#         return reqlist
 
-            if rawstring:
-                deplist = re.findall(r'"(.*?)"', rawstring[0])
-                deplist.extend(re.findall(r"'(.*?)'", rawstring[0]))
-            else:
-                deplist = []
-            reqlist = []
-            for req in deplist:
-                reqlist.append(Requirement.parse(req))
-            f.close()
-        return reqlist
+def getDependenciesOnline(name, version):
+    """Experimental dependency Extraction from online source"""
+
+
 
 
 def newest(linklist):
