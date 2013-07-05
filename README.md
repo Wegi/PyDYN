@@ -1,4 +1,4 @@
-PyDYN
+PyDYN - Python Dependencies You Need
 =====
 
 A proof of concept for a better python dependency management

@@ -36,6 +36,16 @@ class Solution:
         """
         solver.installRecommendation(self.installList, self.uninstallList)
 
+    def writeRequirementsFile(self, path):
+        """Writes a pip-conform requirements.txt to path
+
+        The recomendations for files to uninstall are not reagrded, because the requirements.txt
+        is not made for it."""
+        with open(path, 'w') as f:
+            for tup in self.getInstallTuples():
+                f.write(tup[0]+'=='+tup[1]+'\n')
+                
+
     def drawPNG(self):
         """Output a .png file with the dependency graph after parsed module
         would be installed.
