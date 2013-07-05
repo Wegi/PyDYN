@@ -25,11 +25,12 @@ CACHE = dict()
 class OPBTranslator:
     """An Class to transalte Module-Metadata to OPB and back"""
 
-    def __init__(self, name, version=''):
+    def __init__(self, name, version='', new_meta=False):
         self.name = name.lower()
         self.version = version
         self.reqdict = dict()
         self.vardict = dict()
+        self.new_meta = new_meta
 
     def addDependency(self, name, version=''):
         self.name = name
@@ -43,12 +44,19 @@ class OPBTranslator:
         The translator makes some assumptions, i.e. all dependencys of "name"
         have to be fulfilled strictly.
         """
-        data = json.loads(open('meta.json', 'r').read())
+        if not self.new_meta:
+            data = json.loads(open('meta.json', 'r').read())
 
-        versionslist = versionsFromMeta(self.name, data)
+        if self.new_meta:
+            versionslist = list(versionsFromOnline(self.name))
+        else:
+            versionslist = versionsFromMeta(self.name, data)
         newver = newest(versionslist)
         self.version = newver
-        reqs = list(dependenciesFor(self.name.lower(), self.version, data))
+        if self.new_meta:
+            reqs = list(dependenciesForOnline(self.name.lower(), self.version))
+        else:
+            reqs = list(dependenciesFor(self.name.lower(), self.version, data))
         self.reqdict.update({(self.name.lower(), self.version): reqs})
         todo = reqs
         strict = dict()
@@ -56,10 +64,16 @@ class OPBTranslator:
             strict.update({i.key: i})  # Have to be fullfilled at all times
 
         for req in todo:
-            vlist = versionsFromMeta(req.key, data)
+            if self.new_meta:
+                vlist = list(versionsFromOnline(req.key))
+            else:
+                vlist = versionsFromMeta(req.key, data)
             for version in vlist:
                 if version in req:  # only use if linktup fullfills requirement
-                    templist = list(dependenciesFor(req.key, version, data))
+                    if self.new_meta:
+                        templist = list(dependenciesForOnline(req.key, version))
+                    else:
+                        templist = list(dependenciesFor(req.key, version, data))
                     for item in templist:
                         if item not in todo:
                             todo.append(item)
@@ -213,6 +227,30 @@ def dependenciesFor(name, version, data):
         for item in data[name][version]:
             yield Requirement.parse(item)
 
+def dependenciesForOnline(name, version):
+    """Experimental dependency Extraction from online source"""
+    try:
+        handle = urllib.request.urlopen(META_URL+name[0]+'/'+name+'/package-'+version+'.json')
+        data = json.loads(handle.read().decode('utf-8'))
+    except urllib.error.HTTPError:
+        data = dict()
+    if 'requirements' in data:
+        if 'install' in data['requirements']:
+            for item in data['requirements']['install']:
+                yield Requirement.parse(item.replace("(", "").replace(")", ""))
+
+def versionsFromOnline(name):
+    try:
+        handle = urllib.request.urlopen(META_URL+name[0]+'/'+name+'/project.json')
+        data = json.loads(handle.read().decode('utf-8'))
+    except urllib.error.HTTPError:
+        data = dict()
+    tempset = set()
+    for package in data['files']:
+        tempset.add(package['version'])
+    return tempset
+
+
 
 def parseURL(name):
     """Provides a linklist for a module.
@@ -286,11 +324,6 @@ def downloadPackage(link):
 #                 reqlist.append(Requirement.parse(req))
 #             f.close()
 #         return reqlist
-
-def getDependenciesOnline(name, version):
-    """Experimental dependency Extraction from online source"""
-
-
 
 
 def newest(linklist):

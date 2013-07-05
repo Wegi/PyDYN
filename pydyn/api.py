@@ -44,7 +44,7 @@ class Solution:
         with open(path, 'w') as f:
             for tup in self.getInstallTuples():
                 f.write(tup[0]+'=='+tup[1]+'\n')
-                
+
 
     def drawPNG(self):
         """Output a .png file with the dependency graph after parsed module
@@ -71,7 +71,7 @@ class Solution:
 class Problem:
 
     def __init__(self, name, solverprog='./wbo/wbo',
-                 solverOptions=['-file-format=opb'], wset=None):
+                 solverOptions=['-file-format=opb'], wset=None, new_meta=False):
         """Set the parameter for the module which you want to install."""
 
         self.solverprog = solverprog
@@ -81,7 +81,7 @@ class Problem:
             self.wset = wset
         else:
             self.wset = pkg_resources.working_set
-        self.opb_translator = solver.OPBTranslator(name)
+        self.opb_translator = solver.OPBTranslator(name, new_meta=new_meta)
         self.opb_translator.generateMetadata()
 
     def solve(self):
